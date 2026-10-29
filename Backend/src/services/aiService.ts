@@ -5,6 +5,7 @@ import {
   itineraryResponseSchema,
 } from '../schemas/itineraryResponse';
 import { buildItineraryPrompt } from '../utils/promptBuilder';
+import { logger } from '../utils/logger';
 
 export class AiServiceError extends Error {
   public statusCode: number;
@@ -78,9 +79,34 @@ export class AiService {
   }
 
   /**
-   * Calls the Gemini API with bounded timeout.
+   * Determines whether an error is transient and eligible for bounded retry.
    */
-  private async callProvider(
+  private isTransientError(err: unknown): boolean {
+    const errorObj = err as Record<string, unknown> | undefined;
+    const message =
+      typeof errorObj?.['message'] === 'string'
+        ? errorObj['message'].toLowerCase()
+        : '';
+    const status =
+      typeof errorObj?.['status'] === 'number' ? errorObj['status'] : undefined;
+
+    return (
+      errorObj?.['name'] === 'TimeoutError' ||
+      message.includes('timed out') ||
+      message.includes('etimedout') ||
+      message.includes('econnreset') ||
+      message.includes('econnrefused') ||
+      message.includes('resourceexhausted') ||
+      message.includes('unavailable') ||
+      status === 503 ||
+      status === 429
+    );
+  }
+
+  /**
+   * Executes a single provider invocation wrapped with bounded request timeout.
+   */
+  private async executeSingleCall(
     contents: string,
     systemInstruction?: string
   ): Promise<string> {
@@ -93,48 +119,79 @@ export class AiService {
       if (typeof timer.unref === 'function') timer.unref();
     });
 
-    try {
-      let callPromise: Promise<{ text?: string | null }>;
+    let callPromise: Promise<{ text?: string | null }>;
 
-      if (this.customGenerator) {
-        callPromise = this.customGenerator({
-          model: this.model,
-          contents,
-          config: {
-            systemInstruction,
-            responseMimeType: 'application/json',
-          },
-        });
-      } else {
-        const client = this.getClient();
-        callPromise = client.models.generateContent({
-          model: this.model,
-          contents,
-          config: {
-            systemInstruction,
-            responseMimeType: 'application/json',
-          },
-        });
-      }
-
-      const response = await Promise.race([callPromise, timeoutPromise]);
-      const text = response.text?.trim();
-
-      if (!text) {
-        throw new AiServiceError('Received empty response from AI model', 502);
-      }
-
-      return text;
-    } catch (err: unknown) {
-      if (err instanceof AiServiceError) {
-        throw err;
-      }
-      this.mapProviderError(err);
-      throw new AiServiceError(
-        'An unexpected error occurred while communicating with the AI service',
-        500
-      );
+    if (this.customGenerator) {
+      callPromise = this.customGenerator({
+        model: this.model,
+        contents,
+        config: {
+          systemInstruction,
+          responseMimeType: 'application/json',
+        },
+      });
+    } else {
+      const client = this.getClient();
+      callPromise = client.models.generateContent({
+        model: this.model,
+        contents,
+        config: {
+          systemInstruction,
+          responseMimeType: 'application/json',
+        },
+      });
     }
+
+    const response = await Promise.race([callPromise, timeoutPromise]);
+    const text = response.text?.trim();
+
+    if (!text) {
+      throw new AiServiceError('Received empty response from AI model', 502);
+    }
+
+    return text;
+  }
+
+  /**
+   * Calls the Gemini API with bounded timeout and bounded retry for transient errors.
+   */
+  private async callProvider(
+    contents: string,
+    systemInstruction?: string
+  ): Promise<string> {
+    const MAX_ATTEMPTS = 2; // Strict limit: 1 initial attempt + at most 1 retry
+    let lastError: unknown;
+
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      try {
+        return await this.executeSingleCall(contents, systemInstruction);
+      } catch (err: unknown) {
+        lastError = err;
+
+        if (err instanceof AiServiceError) {
+          throw err;
+        }
+
+        // Bounded retry with backoff for transient issues only
+        if (attempt < MAX_ATTEMPTS && this.isTransientError(err)) {
+          logger.warn(`Transient Gemini API failure on attempt ${attempt}. Retrying...`, {
+            attempt,
+            maxAttempts: MAX_ATTEMPTS,
+          });
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          continue;
+        }
+
+        // Non-transient errors fail immediately without wasteful retries
+        this.mapProviderError(err);
+      }
+    }
+
+    this.mapProviderError(lastError);
+    throw new AiServiceError(
+      'An unexpected error occurred while communicating with the AI service',
+      500
+    );
   }
 
   /**
