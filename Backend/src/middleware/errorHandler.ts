@@ -3,6 +3,7 @@ import { Request, Response, NextFunction } from 'express';
 export interface ApiErrorResponse {
   success: false;
   message: string;
+  data: null;
   stack?: string;
 }
 
@@ -25,6 +26,7 @@ export const notFoundHandler = (
   res.status(404).json({
     success: false,
     message: `Route not found: ${req.method} ${req.originalUrl}`,
+    data: null,
   });
 };
 
@@ -49,6 +51,7 @@ export const errorHandler = (
     res.status(400).json({
       success: false,
       message: 'Malformed JSON payload. Please provide a valid JSON body.',
+      data: null,
     });
     return;
   }
@@ -65,6 +68,7 @@ export const errorHandler = (
   const response: ApiErrorResponse = {
     success: false,
     message,
+    data: null,
   };
 
   // Only include stack trace if not in production

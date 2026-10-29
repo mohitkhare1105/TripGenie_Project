@@ -22,8 +22,8 @@ app.use(
   })
 );
 
-// Body parser
-app.use(express.json());
+// Body parser with size limit to prevent oversized payload attacks
+app.use(express.json({ limit: '100kb' }));
 
 // Health Check Endpoint
 app.get('/api/health', (_req: Request, res: Response) => {
@@ -43,4 +43,3 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 export default app;
-
