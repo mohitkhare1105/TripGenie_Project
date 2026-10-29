@@ -1,7 +1,8 @@
-import { describe, it } from 'node:test';
+import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import request from 'supertest';
 import app from '../app';
+import { aiService } from '../services/aiService';
 import {
   itineraryRequestSchema,
   ITINERARY_LIMITS,
@@ -31,6 +32,65 @@ describe('Part 2: Itinerary Request Validation & Management', () => {
     additionalNotes: 'Need leisure afternoons',
   };
 
+  const mockItineraryResponse = {
+    trip: { destination: 'Manali', durationDays: 3, currency: 'INR' },
+    days: [
+      {
+        day: 1,
+        activities: [
+          {
+            period: 'morning',
+            title: 'Hadimba Temple',
+            description: 'Visit temple',
+            category: 'culture',
+            durationMinutes: 90,
+            estimatedCost: 100,
+            costStatus: 'ai_estimate',
+          },
+        ],
+      },
+      {
+        day: 2,
+        activities: [
+          {
+            period: 'morning',
+            title: 'Solang Valley',
+            description: 'Scenic views',
+            category: 'adventure',
+            durationMinutes: 120,
+            estimatedCost: 500,
+            costStatus: 'ai_estimate',
+          },
+        ],
+      },
+      {
+        day: 3,
+        activities: [
+          {
+            period: 'morning',
+            title: 'Riverside Walk',
+            description: 'Relaxation',
+            category: 'relaxation',
+            durationMinutes: 60,
+            estimatedCost: null,
+            costStatus: 'free',
+          },
+        ],
+      },
+    ],
+    notes: ['AI-generated suggestions have not been verified.'],
+  };
+
+  beforeEach(() => {
+    aiService.setCustomGenerator(async () => ({
+      text: JSON.stringify(mockItineraryResponse),
+    }));
+  });
+
+  afterEach(() => {
+    aiService.setCustomGenerator(undefined);
+  });
+
   // Test 1: Valid travel requests
   describe('1. Valid Travel Requests', () => {
     it('should successfully validate and accept a minimal valid travel request', async () => {
@@ -42,12 +102,33 @@ describe('Part 2: Itinerary Request Validation & Management', () => {
       assert.strictEqual(res.body.success, true);
       assert.strictEqual(
         res.body.message,
-        'Itinerary generation endpoint is configured'
+        'Itinerary generated successfully'
       );
-      assert.strictEqual(res.body.data, null);
+      assert.ok(res.body.data);
     });
 
     it('should successfully validate and accept a comprehensive valid travel request', async () => {
+      aiService.setCustomGenerator(async () => ({
+        text: JSON.stringify({
+          ...mockItineraryResponse,
+          trip: { destination: 'Goa', durationDays: 5, currency: 'INR' },
+          days: Array.from({ length: 5 }, (_, i) => ({
+            day: i + 1,
+            activities: [
+              {
+                period: 'morning',
+                title: `Day ${i + 1} Activity`,
+                description: 'Beach walk',
+                category: 'relaxation',
+                durationMinutes: 60,
+                estimatedCost: 200,
+                costStatus: 'ai_estimate',
+              },
+            ],
+          })),
+        }),
+      }));
+
       const res = await request(app)
         .post('/api/itineraries/generate')
         .send(validFullRequest);
@@ -56,7 +137,7 @@ describe('Part 2: Itinerary Request Validation & Management', () => {
       assert.strictEqual(res.body.success, true);
       assert.strictEqual(
         res.body.message,
-        'Itinerary generation endpoint is configured'
+        'Itinerary generated successfully'
       );
     });
 
@@ -420,12 +501,11 @@ describe('Part 2: Itinerary Request Validation & Management', () => {
         .post('/api/itineraries/generate')
         .send({ destination: 'Valid Destination Only' });
 
-      // Controller returns 200 with "Itinerary generation endpoint is configured"
-      // Validation failure must return 400 and NOT the controller's message
+      // Validation failure must return 400 and NOT the controller's success message
       assert.strictEqual(res.status, 400);
       assert.notStrictEqual(
         res.body.message,
-        'Itinerary generation endpoint is configured'
+        'Itinerary generated successfully'
       );
       assert.strictEqual(res.body.success, false);
       assert.strictEqual(res.body.data, null);
