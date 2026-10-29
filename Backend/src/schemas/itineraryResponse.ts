@@ -15,6 +15,9 @@ export const ACTIVITY_CATEGORIES = [
   'relaxation',
   'shopping',
   'travel',
+  'transport',
+  'accommodation',
+  'activities',
   'nature',
   'entertainment',
   'other',
@@ -26,6 +29,8 @@ export const COST_STATUSES = [
   'free',
   'unknown',
 ] as const;
+
+export const PRICING_TYPES = ['group', 'per_person'] as const;
 
 /**
  * Schema for an individual itinerary activity.
@@ -69,7 +74,24 @@ export const activityItemSchema = z.object({
         message: `Cost status must be one of: ${COST_STATUSES.join(', ')}`,
       }),
     })
-    .default('ai_estimate'),
+    .optional(),
+  pricingType: z
+    .enum(PRICING_TYPES, {
+      errorMap: () => ({
+        message: `Pricing type must be one of: ${PRICING_TYPES.join(', ')}`,
+      }),
+    })
+    .optional(),
+  expenseCategory: z
+    .enum([
+      'transport',
+      'accommodation',
+      'food',
+      'activities',
+      'shopping',
+      'miscellaneous',
+    ])
+    .optional(),
   location: z.string().trim().max(100).optional(),
   suggestedTime: z.string().trim().max(50).optional(),
 });
@@ -127,4 +149,3 @@ export type ActivityItem = z.infer<typeof activityItemSchema>;
 export type DayPlan = z.infer<typeof dayPlanSchema>;
 export type TripSummary = z.infer<typeof tripSummarySchema>;
 export type ItineraryResponse = z.infer<typeof itineraryResponseSchema>;
-

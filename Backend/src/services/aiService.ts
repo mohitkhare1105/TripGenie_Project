@@ -222,14 +222,15 @@ export class AiService {
   }
 
   /**
-   * Main entry point: Generates, parses, and validates an itinerary from user preferences.
-   * Performs at most ONE bounded repair attempt if initial response is invalid.
+   * Core generation method with parsing, duration validation, and bounded repair.
    */
-  public async generateItinerary(
-    request: ItineraryRequest
+  public async generateFromPrompt(
+    userPrompt: string,
+    systemInstruction: string,
+    expectedDays: number,
+    destination: string
   ): Promise<ItineraryResponse> {
-    const prompt = buildItineraryPrompt(request);
-    let rawText = await this.callProvider(prompt.userPrompt, prompt.systemInstruction);
+    let rawText = await this.callProvider(userPrompt, systemInstruction);
 
     let parsedJson: unknown;
     let validationResult;
@@ -245,8 +246,8 @@ export class AiService {
     // Check if initial output meets schema and duration requirements
     if (
       validationResult.success &&
-      validationResult.data.trip.durationDays === request.durationDays &&
-      validationResult.data.days.length === request.durationDays
+      validationResult.data.trip.durationDays === expectedDays &&
+      validationResult.data.days.length === expectedDays
     ) {
       return validationResult.data;
     }
@@ -256,21 +257,21 @@ export class AiService {
       ? (validationResult as { error: unknown }).error instanceof Error
         ? ((validationResult as { error: unknown }).error as Error).message
         : JSON.stringify(validationResult)
-      : `Number of days (${(parsedJson as { days?: unknown[] })?.days?.length}) does not match requested duration (${request.durationDays})`;
+      : `Number of days (${(parsedJson as { days?: unknown[] })?.days?.length}) does not match requested duration (${expectedDays})`;
 
     const repairPrompt = `Your previous JSON response was invalid or did not match the required schema:
 Issues: ${issueSummary}
 
-Please regenerate the complete, strictly valid JSON for a ${request.durationDays}-day trip to ${request.destination} with EXACTLY ${request.durationDays} day objects in the "days" array. Do not include markdown or explanations.`;
+Please regenerate the complete, strictly valid JSON for a ${expectedDays}-day trip to ${destination} with EXACTLY ${expectedDays} day objects in the "days" array. Do not include markdown or explanations.`;
 
-    rawText = await this.callProvider(repairPrompt, prompt.systemInstruction);
+    rawText = await this.callProvider(repairPrompt, systemInstruction);
     parsedJson = this.parseJsonText(rawText);
     const secondValidation = itineraryResponseSchema.safeParse(parsedJson);
 
     if (
       !secondValidation.success ||
-      secondValidation.data.trip.durationDays !== request.durationDays ||
-      secondValidation.data.days.length !== request.durationDays
+      secondValidation.data.trip.durationDays !== expectedDays ||
+      secondValidation.data.days.length !== expectedDays
     ) {
       throw new AiServiceError(
         'Upstream AI provider failed to return a valid itinerary structure after repair attempt',
@@ -279,6 +280,21 @@ Please regenerate the complete, strictly valid JSON for a ${request.durationDays
     }
 
     return secondValidation.data;
+  }
+
+  /**
+   * Main entry point: Generates, parses, and validates an itinerary from user preferences.
+   */
+  public async generateItinerary(
+    request: ItineraryRequest
+  ): Promise<ItineraryResponse> {
+    const prompt = buildItineraryPrompt(request);
+    return this.generateFromPrompt(
+      prompt.userPrompt,
+      prompt.systemInstruction,
+      request.durationDays,
+      request.destination
+    );
   }
 }
 
