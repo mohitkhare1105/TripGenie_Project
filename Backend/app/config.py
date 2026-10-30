@@ -68,8 +68,7 @@ class Settings(BaseSettings):
     @property
     def server_port(self) -> int:
         """
-        Ensures FastAPI runs on port 8000 by default to peacefully coexist
-        with Express backend on port 5000.
+        Determines listening port: checks FASTAPI_PORT override, then PORT (assigned by Render in production, default 8000).
         """
         if self.FASTAPI_PORT is not None:
             return self.FASTAPI_PORT
@@ -78,9 +77,6 @@ class Settings(BaseSettings):
                 return int(os.environ["FASTAPI_PORT"])
             except ValueError:
                 pass
-        # If PORT was loaded as 5000 from shared Express .env, default FastAPI to 8000
-        if self.PORT == 5000:
-            return 8000
         return self.PORT
 
     @property
