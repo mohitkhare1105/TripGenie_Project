@@ -130,7 +130,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         onClose();
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Authentication failed.');
+      const msg = err instanceof Error ? err.message : 'Authentication failed.';
+      if (msg.toLowerCase().includes('email not confirmed')) {
+        setError(
+          'Email not confirmed yet. Please click the confirmation link sent to your email, or confirm your user in the Supabase Dashboard.'
+        );
+      } else {
+        setError(msg);
+      }
     } finally {
       setIsLoading(false);
     }

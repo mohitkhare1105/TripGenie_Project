@@ -29,6 +29,7 @@ import {
   saveUserTrip,
   ApiError,
 } from './services/api';
+import { supabase } from './services/supabase';
 import { SavedTripRecord } from './types';
 import { Compass, RotateCcw, Sparkles } from 'lucide-react';
 
@@ -66,10 +67,23 @@ export const App: React.FC = () => {
 
   // Check auth on load
   useEffect(() => {
-    const token = localStorage.getItem('supabase_auth_token');
-    const storedEmail = localStorage.getItem('tripgenie_user_email');
-    if (token) {
-      setUserEmail(storedEmail || 'Explorer');
+    if (supabase) {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session?.user?.email) {
+          setUserEmail(session.user.email);
+          return;
+        }
+      });
+    }
+
+    const storedEmail =
+      localStorage.getItem('user_email') ||
+      localStorage.getItem('tripgenie_user_email');
+    const token =
+      localStorage.getItem('supabase_token') ||
+      localStorage.getItem('supabase_auth_token');
+    if (token && storedEmail) {
+      setUserEmail(storedEmail);
     }
   }, []);
 
@@ -79,8 +93,14 @@ export const App: React.FC = () => {
   };
 
   const handleSignOut = () => {
+    localStorage.removeItem('supabase_token');
     localStorage.removeItem('supabase_auth_token');
+    localStorage.removeItem('user_email');
+    localStorage.removeItem('user_name');
     localStorage.removeItem('tripgenie_user_email');
+    if (supabase) {
+      supabase.auth.signOut().catch(() => {});
+    }
     setUserEmail(null);
   };
 
@@ -126,7 +146,15 @@ export const App: React.FC = () => {
       }, 100);
     } catch (err: unknown) {
       if (err instanceof ApiError) {
-        setErrorMessage(err.message);
+        if (err.statusCode === 401 || err.message.toLowerCase().includes('token')) {
+          localStorage.removeItem('supabase_token');
+          localStorage.removeItem('supabase_auth_token');
+          setErrorMessage(
+            'Your session token is unverified or expired. You can continue planning as a guest, or log in after confirming your email.'
+          );
+        } else {
+          setErrorMessage(err.message);
+        }
         setFieldErrors(err.errors);
       } else {
         setErrorMessage(

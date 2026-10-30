@@ -117,10 +117,15 @@ async def get_current_user(authorization: Optional[str] = Header(None)) -> UserC
 async def get_optional_user(authorization: Optional[str] = Header(None)) -> Optional[UserContext]:
     """
     FastAPI dependency that returns UserContext if a valid Authorization header is present,
-    or None if no Authorization header was provided.
-    Raises HTTP 401 if an invalid/expired token was provided.
+    or None if no Authorization header was provided or if the provided token is invalid/expired.
+    Ensures public endpoints (such as itinerary generation and budget optimization)
+    continue gracefully for guests even if a stale/unverified token is attached.
     """
     if not authorization:
         return None
-    return await get_current_user(authorization)
+    try:
+        return await get_current_user(authorization)
+    except AuthenticationError as e:
+        logger.info(f"Optional auth token unverified: {e.message}. Proceeding as guest.")
+        return None
 

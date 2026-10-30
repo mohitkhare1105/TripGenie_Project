@@ -29,29 +29,37 @@ export class ApiError extends Error {
   }
 }
 
+function isValidJwt(token: string): boolean {
+  if (!token || typeof token !== 'string') return false;
+  const parts = token.trim().split('.');
+  return parts.length === 3 && parts[0].startsWith('eyJ');
+}
+
 /**
  * Retrieves the Supabase authentication access token if available in browser storage.
- * Inspects explicit keys as well as the standard Supabase Auth SDK session cache (sb-<ref>-auth-token).
+ * Prioritizes the official Supabase Auth SDK session cache (sb-<ref>-auth-token),
+ * and validates that the token has a valid 3-part JWT structure.
  */
 export function getAuthToken(): string | null {
   try {
-    // Check direct storage keys
+    // 1. Scan localStorage for Supabase JS SDK session keys (e.g. sb-xyz-auth-token)
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
+        const item = JSON.parse(localStorage.getItem(key) || '{}');
+        const token = item?.access_token;
+        if (token && isValidJwt(token)) return token;
+      }
+    }
+
+    // 2. Check direct storage keys
     const directToken =
       localStorage.getItem('supabase_token') ||
       localStorage.getItem('sb-access-token') ||
       sessionStorage.getItem('supabase_token') ||
       sessionStorage.getItem('sb-access-token');
 
-    if (directToken) return directToken;
-
-    // Scan localStorage for Supabase JS SDK session keys (e.g. sb-xyz-auth-token)
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
-        const item = JSON.parse(localStorage.getItem(key) || '{}');
-        if (item?.access_token) return item.access_token;
-      }
-    }
+    if (directToken && isValidJwt(directToken)) return directToken;
   } catch {
     // Gracefully handle storage access restrictions or JSON parse errors
   }
@@ -105,12 +113,29 @@ export async function generateItinerary(
   const timeoutId = setTimeout(() => controller.abort(), 60000);
 
   try {
-    const res = await fetch(`${API_BASE_URL}/api/itineraries/generate`, {
+    let res = await fetch(`${API_BASE_URL}/api/itineraries/generate`, {
       method: 'POST',
       headers: buildHeaders(authToken),
       body: JSON.stringify(input),
       signal: controller.signal,
     });
+
+    // If an invalid or unconfirmed token was rejected with 401 on this public endpoint,
+    // seamlessly retry as a guest so the user is never blocked.
+    if (res.status === 401) {
+      console.warn('Bearer token was rejected by backend. Retrying as guest...');
+      localStorage.removeItem('supabase_token');
+      localStorage.removeItem('supabase_auth_token');
+      res = await fetch(`${API_BASE_URL}/api/itineraries/generate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify(input),
+        signal: controller.signal,
+      });
+    }
 
     const json: ApiResponse<ItineraryData> = await res.json().catch(() => ({
       success: false,
@@ -167,12 +192,29 @@ export async function optimizeBudget(
   const timeoutId = setTimeout(() => controller.abort(), 60000);
 
   try {
-    const res = await fetch(`${API_BASE_URL}/api/itineraries/optimize-budget`, {
+    let res = await fetch(`${API_BASE_URL}/api/itineraries/optimize-budget`, {
       method: 'POST',
       headers: buildHeaders(authToken),
       body: JSON.stringify(params),
       signal: controller.signal,
     });
+
+    // If an invalid or unconfirmed token was rejected with 401 on this public endpoint,
+    // seamlessly retry as a guest so the user is never blocked.
+    if (res.status === 401) {
+      console.warn('Bearer token was rejected by backend. Retrying as guest...');
+      localStorage.removeItem('supabase_token');
+      localStorage.removeItem('supabase_auth_token');
+      res = await fetch(`${API_BASE_URL}/api/itineraries/optimize-budget`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify(params),
+        signal: controller.signal,
+      });
+    }
 
     const json: ApiResponse<OptimizeBudgetResponseData> = await res
       .json()
