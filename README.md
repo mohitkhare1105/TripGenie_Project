@@ -207,7 +207,64 @@ npm run typecheck
 
 ---
 
-## 8. Production Build
+## 8. Python FastAPI Backend (Migration Phase 1)
+
+As part of the Python + FastAPI migration, Phase 1 establishes the FastAPI backend foundation running side-by-side with the Express backend:
+
+| Service | Port | Description |
+|---|---|---|
+| **Express Backend** | `5000` | Full legacy TypeScript backend (Parts 1–6) |
+| **FastAPI Backend** | `8000` | Modular FastAPI backend foundation (Phase 1) |
+| **React Frontend** | `5173` | Vite development server |
+
+### Setup FastAPI Virtual Environment
+
+```bash
+cd Backend
+
+# Create virtual environment
+python -m venv venv
+
+# Activate virtual environment
+# Windows:
+.\venv\Scripts\activate
+# macOS/Linux:
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+### Running the FastAPI Backend
+
+```bash
+cd Backend
+
+# Using the run script (runs on port 8000 by default):
+python run.py
+
+# Or directly using Uvicorn:
+uvicorn app.main:app --port 8000 --reload
+```
+
+- **Health check endpoint:** `http://localhost:8000/api/health`
+- **Interactive Swagger Docs:** `http://localhost:8000/docs`
+
+### Running FastAPI Automated Tests
+
+```bash
+cd Backend
+
+# Run verbose pytest suite:
+python -m pytest -v
+
+# Run short traceback pytest:
+python -m pytest --tb=short
+```
+
+---
+
+## 9. Production Build
 
 To build both services for production:
 
