@@ -4,19 +4,24 @@ import sys
 from typing import Any, Dict
 
 # Regex patterns for sensitive credentials
-API_KEY_PATTERN = re.compile(r"(AIza[0-9A-Za-z-_]{35}|AQ\.[A-Za-z0-9_-]+)")
+API_KEY_PATTERN = re.compile(r"(AIza[0-9A-Za-z-_]{35}|AQ\.[A-Za-z0-9_-]+|sbp_[a-zA-Z0-9]{20,})")
 AUTH_HEADER_PATTERN = re.compile(r"Bearer\s+[A-Za-z0-9\-._~+/]+=*", re.IGNORECASE)
-KEY_VALUE_PATTERN = re.compile(r'("?(?:apiKey|password|secret|key|token)"?\s*[:=]\s*"?[^",\s]+"?)(?=,|\s|"|$)', re.IGNORECASE)
+JWT_PATTERN = re.compile(r"eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}")
+KEY_VALUE_PATTERN = re.compile(
+    r'("?(?:apiKey|password|secret|key|token|supabase_key|service_role_key)"?\s*[:=]\s*)"?[^",\s]+"?(?=,|\s|"|$)',
+    re.IGNORECASE
+)
 
 
 def redact_secrets(val: Any) -> Any:
     """
-    Recursively redacts API keys, tokens, and passwords from logs.
+    Recursively redacts API keys, tokens, JWTs, and passwords from logs.
     """
     if isinstance(val, str):
-        val = API_KEY_PATTERN.sub("[REDACTED_API_KEY]", val)
+        val = API_KEY_PATTERN.sub("[REDACTED_KEY]", val)
         val = AUTH_HEADER_PATTERN.sub("Bearer [REDACTED_TOKEN]", val)
-        val = KEY_VALUE_PATTERN.sub(r'\1=[REDACTED]', val)
+        val = JWT_PATTERN.sub("[REDACTED_JWT]", val)
+        val = KEY_VALUE_PATTERN.sub(r'\1"[REDACTED]"', val)
         return val
     elif isinstance(val, dict):
         sanitized = {}

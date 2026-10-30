@@ -29,9 +29,20 @@ class Settings(BaseSettings):
     RATE_LIMIT_WINDOW_MS: int = Field(default=900000, description="Rate limit window in milliseconds")
     RATE_LIMIT_MAX_REQUESTS: int = Field(default=20, description="Maximum requests per rate limit window")
 
+    # Supabase Configuration (Optional for app startup; required only for db/auth operations)
+    SUPABASE_URL: Optional[str] = Field(default=None, description="Supabase project URL (e.g. https://xyz.supabase.co)")
+    SUPABASE_ANON_KEY: Optional[str] = Field(default=None, description="Supabase public anon key")
+    SUPABASE_SERVICE_ROLE_KEY: Optional[str] = Field(default=None, description="Supabase service role administrative key (optional)")
+    SUPABASE_JWT_SECRET: Optional[str] = Field(default=None, description="Supabase JWT secret for symmetric token verification (optional)")
+
     @property
     def is_production(self) -> bool:
         return self.NODE_ENV.lower() == "production"
+
+    @property
+    def is_supabase_configured(self) -> bool:
+        """Indicates whether minimal Supabase client credentials are present."""
+        return bool(self.SUPABASE_URL and self.SUPABASE_ANON_KEY)
 
     @property
     def server_port(self) -> int:

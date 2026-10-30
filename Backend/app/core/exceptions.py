@@ -41,11 +41,60 @@ class NotFoundException(AppException):
         )
 
 
+class AuthenticationError(AppException):
+    """Raised when authentication credentials are missing, invalid, or expired."""
+    def __init__(self, message: str = "Authentication failed: invalid or expired token"):
+        super().__init__(
+            message=message,
+            status_code=status.HTTP_401_UNAUTHORIZED
+        )
+
+
+class AuthorizationError(AppException):
+    """Raised when user lacks permission to access the requested resource."""
+    def __init__(self, message: str = "Forbidden: you do not have permission to access this resource"):
+        super().__init__(
+            message=message,
+            status_code=status.HTTP_403_FORBIDDEN
+        )
+
+
+class DatabaseConfigurationError(AppException):
+    """Raised when Supabase database credentials are not configured."""
+    def __init__(self, message: str = "Database service is not configured"):
+        super().__init__(
+            message=message,
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE
+        )
+
+
+class DatabaseOperationError(AppException):
+    """Raised when a database query or operation encounters a failure."""
+    def __init__(self, message: str = "A database operation error occurred"):
+        super().__init__(
+            message=message,
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+class ResourceConflictError(AppException):
+    """Raised on unique constraint or duplicate resource creation."""
+    def __init__(self, message: str = "Resource already exists"):
+        super().__init__(
+            message=message,
+            status_code=status.HTTP_409_CONFLICT
+        )
+
+
 async def app_exception_handler(request: Request, exc: AppException) -> JSONResponse:
     request_id = getattr(request.state, "request_id", "unknown")
     logger.warning(f"[{request_id}] AppException ({exc.status_code}): {exc.message}")
+    headers = {}
+    if exc.status_code == status.HTTP_401_UNAUTHORIZED:
+        headers["WWW-Authenticate"] = "Bearer"
     return JSONResponse(
         status_code=exc.status_code,
+        headers=headers,
         content={
             "success": False,
             "message": exc.message,
@@ -111,4 +160,3 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
             "errors": None,
         },
     )
-
