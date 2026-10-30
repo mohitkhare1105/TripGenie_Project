@@ -14,6 +14,29 @@ from .trip import (
     TripResponse,
     TripListResponse,
 )
+from .itinerary import (
+    ItineraryRequest,
+    ItineraryResponse,
+    TripInfo,
+    ActivityItem,
+    DayPlan,
+    GeneratedItineraryData,
+    DESTINATION_MAX_LENGTH,
+    STARTING_CITY_MAX_LENGTH,
+    MIN_DURATION_DAYS,
+    MAX_DURATION_DAYS,
+    MIN_BUDGET,
+    MAX_BUDGET,
+    MIN_TRAVELLERS,
+    MAX_TRAVELLERS,
+)
+from .budget import (
+    BudgetBreakdown,
+    CategoryTotals,
+    OptimizeBudgetRequest,
+    OptimizeBudgetResponse,
+    BUDGET_CATEGORIES,
+)
 
 __all__ = [
     "ApiResponse",
@@ -31,4 +54,23 @@ __all__ = [
     "TripUpdate",
     "TripResponse",
     "TripListResponse",
+    "ItineraryRequest",
+    "ItineraryResponse",
+    "TripInfo",
+    "ActivityItem",
+    "DayPlan",
+    "GeneratedItineraryData",
+    "BudgetBreakdown",
+    "CategoryTotals",
+    "OptimizeBudgetRequest",
+    "OptimizeBudgetResponse",
+    "BUDGET_CATEGORIES",
+    "DESTINATION_MAX_LENGTH",
+    "STARTING_CITY_MAX_LENGTH",
+    "MIN_DURATION_DAYS",
+    "MAX_DURATION_DAYS",
+    "MIN_BUDGET",
+    "MAX_BUDGET",
+    "MIN_TRAVELLERS",
+    "MAX_TRAVELLERS",
 ]

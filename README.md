@@ -207,15 +207,22 @@ npm run typecheck
 
 ---
 
-## 8. Python FastAPI Backend (Migration Phase 1)
+## 8. Python FastAPI Backend (Migration Phases 1, 2 & 3)
 
-As part of the Python + FastAPI migration, Phase 1 establishes the FastAPI backend foundation running side-by-side with the Express backend:
+As part of the Python + FastAPI migration:
+- **Phase 1:** Established the FastAPI backend foundation with security middleware, request ID tracing, and CORS.
+- **Phase 2:** Integrated **Supabase PostgreSQL & Supabase Auth** with Row Level Security (RLS), JWT verification, and persistence for user profiles, saved trips, and travel preferences.
+- **Phase 3:** Migrated **Itinerary API endpoints, Pydantic v2 validation, input sanitization, and deterministic budget calculation & optimizer logic** with a provider-independent AI interface.
 
 | Service | Port | Description |
 |---|---|---|
 | **Express Backend** | `5000` | Full legacy TypeScript backend (Parts 1–6) |
-| **FastAPI Backend** | `8000` | Modular FastAPI backend foundation (Phase 1) |
+| **FastAPI Backend** | `8000` | Modular FastAPI + Supabase backend (Phases 1–3) |
 | **React Frontend** | `5173` | Vite development server |
+
+### API Documentation & Specifications
+
+See [`Backend/API_DOCUMENTATION.md`](Backend/API_DOCUMENTATION.md) for full request/response schemas, field constraints, and error codes.
 
 ### Setup FastAPI Virtual Environment
 
@@ -231,9 +238,18 @@ python -m venv venv
 # macOS/Linux:
 source venv/bin/activate
 
-# Install dependencies
+# Install dependencies (FastAPI, Uvicorn, Supabase, PyJWT, Cryptography)
 pip install -r requirements.txt
 ```
+
+### Supabase Database & Migrations
+
+See [`Backend/SUPABASE_SETUP.md`](Backend/SUPABASE_SETUP.md) for full project setup and credential instructions.
+
+Apply the version-controlled SQL migrations from `Backend/supabase/migrations/`:
+- `001_create_profiles.sql`: User profiles table with auto-creation trigger on `auth.users` and RLS.
+- `002_create_trips.sql`: Saved itineraries table, constraints, performance indexes, and RLS.
+- `003_create_user_preferences.sql`: Persistent travel preferences table with unique user constraint and RLS.
 
 ### Running the FastAPI Backend
 
@@ -248,14 +264,19 @@ uvicorn app.main:app --port 8000 --reload
 ```
 
 - **Health check endpoint:** `http://localhost:8000/api/health`
+- **Database health probe:** `http://localhost:8000/api/health/database`
+- **Itinerary generation:** `POST http://localhost:8000/api/itineraries/generate`
+- **Smart budget optimizer:** `POST http://localhost:8000/api/itineraries/optimize-budget`
 - **Interactive Swagger Docs:** `http://localhost:8000/docs`
 
 ### Running FastAPI Automated Tests
 
+The test suite covers validation, sanitization, budget calculation, optimizer logic, JWT auth, database resilience, and repository CRUD:
+
 ```bash
 cd Backend
 
-# Run verbose pytest suite:
+# Run verbose pytest suite (63 tests):
 python -m pytest -v
 
 # Run short traceback pytest:
