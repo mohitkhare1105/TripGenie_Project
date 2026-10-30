@@ -34,8 +34,12 @@ def verify_supabase_jwt(token: str) -> Dict[str, Any]:
     1. Local signature verification via SUPABASE_JWT_SECRET (HS256).
     2. Supabase GoTrue Auth API verification via get_user(token) for projects with asymmetric or rotated keys.
     """
-    # 1. Attempt local JWT secret verification if configured
-    if settings.SUPABASE_JWT_SECRET:
+    # 1. Attempt local JWT secret verification if configured with a real secret
+    if (
+        settings.SUPABASE_JWT_SECRET
+        and settings.SUPABASE_JWT_SECRET.strip()
+        and "your_" not in settings.SUPABASE_JWT_SECRET
+    ):
         try:
             payload = jwt.decode(
                 token,

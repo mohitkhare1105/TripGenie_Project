@@ -77,7 +77,7 @@ export const ItineraryDisplay: React.FC<ItineraryDisplayProps> = ({
     <div className="space-y-8">
       {/* Trip Header Banner with Unsplash Destination Image */}
       <div
-        className="relative rounded-2xl overflow-hidden shadow-md text-white min-h-[220px] flex flex-col justify-end transition-all"
+        className="relative rounded-card overflow-hidden shadow-lg text-white min-h-[240px] flex flex-col justify-end transition-all"
         style={
           heroImage?.url
             ? {
@@ -134,7 +134,7 @@ export const ItineraryDisplay: React.FC<ItineraryDisplayProps> = ({
 
       {/* Destination Photo Gallery Highlights */}
       {images && images.images && images.images.length > 1 && (
-        <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm">
+        <div className="bg-white rounded-3xl border border-slate-200/90 p-5 sm:p-6 shadow-sm">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center">
               <Camera className="w-4 h-4 text-sky-600 mr-1.5" />
@@ -173,7 +173,7 @@ export const ItineraryDisplay: React.FC<ItineraryDisplayProps> = ({
         {days.map((dayPlan) => (
           <div
             key={dayPlan.day}
-            className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"
+            className="bg-white rounded-3xl border border-slate-200/90 shadow-sm overflow-hidden"
           >
             {/* Day Header */}
             <div className="bg-slate-50 border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">

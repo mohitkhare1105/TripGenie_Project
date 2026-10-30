@@ -52,7 +52,7 @@ export const BudgetSummary: React.FC<BudgetSummaryProps> = ({
   ][];
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8 mb-8">
+    <div className="bg-white rounded-card border border-slate-200/90 shadow-md p-6 sm:p-10 mb-8">
       {/* Header and Status */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-6 border-b border-slate-100 gap-4">
         <div>
@@ -96,9 +96,9 @@ export const BudgetSummary: React.FC<BudgetSummaryProps> = ({
             type="button"
             onClick={onOpenOptimizer}
             disabled={isOptimizing}
-            className="inline-flex items-center px-4 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-indigo-50 to-sky-50 text-indigo-700 hover:from-indigo-100 hover:to-sky-100 border border-indigo-200/60 shadow-sm transition-all"
+            className="inline-flex items-center px-5 py-2.5 rounded-btn text-xs font-bold bg-coral-pulse hover:bg-[#E02445] text-white shadow-md shadow-coral-pulse/20 transition-all cursor-pointer"
           >
-            <Sparkles className="w-3.5 h-3.5 mr-1.5 text-indigo-600" />
+            <Sparkles className="w-3.5 h-3.5 mr-1.5" />
             {isOverBudget ? 'Optimize to Fit Budget' : 'Smart Budget Optimizer'}
           </button>
         )}

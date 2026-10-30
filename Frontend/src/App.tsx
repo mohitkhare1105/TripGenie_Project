@@ -1,11 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Navbar } from './components/Navbar';
+import { HeroSection } from './components/HeroSection';
 import { TravelForm } from './components/TravelForm';
+import { PopularDestinations, DestinationPreset } from './components/PopularDestinations';
+import { HowItWorks } from './components/HowItWorks';
+import { FeaturesSection } from './components/FeaturesSection';
+import { ItineraryPreviewSection } from './components/ItineraryPreviewSection';
+import { TestimonialsSection } from './components/TestimonialsSection';
+import { FinalCtaSection } from './components/FinalCtaSection';
+import { Footer } from './components/Footer';
 import { BudgetSummary } from './components/BudgetSummary';
 import { ItineraryDisplay } from './components/ItineraryDisplay';
 import { BudgetOptimizerModal } from './components/BudgetOptimizerModal';
 import { LoadingState } from './components/LoadingState';
 import { ErrorBanner } from './components/ErrorBanner';
+import { AuthModal } from './components/AuthModal';
+import { DashboardModal } from './components/DashboardModal';
 import {
   ItineraryFormInput,
   ItineraryData,
@@ -18,14 +28,16 @@ import {
   fetchDestinationImages,
   ApiError,
 } from './services/api';
-import { Compass, RotateCcw } from 'lucide-react';
+import { Compass, RotateCcw, Sparkles } from 'lucide-react';
 
 export const App: React.FC = () => {
+  // Itinerary & Results States
   const [itineraryData, setItineraryData] = useState<ItineraryData | null>(null);
   const [destinationImages, setDestinationImages] =
     useState<DestinationImagesData | null>(null);
   const [lastSubmittedInput, setLastSubmittedInput] =
     useState<ItineraryFormInput | null>(null);
+  const [prefillData, setPrefillData] = useState<Partial<ItineraryFormInput> | null>(null);
 
   // Loading & Error States
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -40,6 +52,51 @@ export const App: React.FC = () => {
   const [optimizationResult, setOptimizationResult] =
     useState<OptimizeBudgetResponseData | null>(null);
 
+  // Auth & Dashboard States
+  const [isAuthOpen, setIsAuthOpen] = useState<boolean>(false);
+  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
+  const [isDashboardOpen, setIsDashboardOpen] = useState<boolean>(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+
+  // Check auth on load
+  useEffect(() => {
+    const token = localStorage.getItem('supabase_auth_token');
+    const storedEmail = localStorage.getItem('tripgenie_user_email');
+    if (token) {
+      setUserEmail(storedEmail || 'Explorer');
+    }
+  }, []);
+
+  const handleAuthSuccess = (email: string) => {
+    setUserEmail(email);
+    setIsAuthOpen(false);
+  };
+
+  const handleSignOut = () => {
+    localStorage.removeItem('supabase_auth_token');
+    localStorage.removeItem('tripgenie_user_email');
+    setUserEmail(null);
+  };
+
+  const scrollToPlanner = () => {
+    const plannerEl = document.getElementById('planner');
+    if (plannerEl) {
+      plannerEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  const handleSelectPopularDestination = (preset: DestinationPreset) => {
+    setPrefillData({
+      destination: preset.destination,
+      durationDays: preset.durationDays,
+      budget: preset.budget,
+      travellers: preset.travellers,
+      travelStyle: preset.travelStyle,
+      interests: preset.highlights,
+    });
+    scrollToPlanner();
+  };
+
   const handleGenerateItinerary = async (formData: ItineraryFormInput) => {
     setIsLoading(true);
     setErrorMessage(null);
@@ -53,8 +110,14 @@ export const App: React.FC = () => {
       ]);
       setItineraryData(data);
       setDestinationImages(imagesData);
-      // Scroll smoothly down to results
-      window.scrollTo({ top: 380, behavior: 'smooth' });
+
+      // Smooth scroll to generated results
+      setTimeout(() => {
+        const resultsEl = document.getElementById('results-section');
+        if (resultsEl) {
+          resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
     } catch (err: unknown) {
       if (err instanceof ApiError) {
         setErrorMessage(err.message);
@@ -115,60 +178,86 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800">
-      <Navbar onReset={handleReset} />
+    <div className="min-h-screen flex flex-col bg-slate-50/60 text-slate-800 font-sans selection:bg-bright-cyan/20 selection:text-deep-navy">
+      {/* 1. Header / Navbar */}
+      <Navbar
+        onReset={handleReset}
+        onOpenAuth={(mode = 'login') => {
+          setAuthMode(mode);
+          setIsAuthOpen(true);
+        }}
+        onOpenDashboard={() => setIsDashboardOpen(true)}
+        isLoggedIn={Boolean(userEmail)}
+        userEmail={userEmail}
+        onSignOut={handleSignOut}
+      />
 
-      <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+      {/* Main Content Area */}
+      <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 w-full">
         {/* Error notification banner */}
         {errorMessage && (
-          <ErrorBanner
-            message={errorMessage}
-            fieldErrors={fieldErrors}
-            onRetry={
-              lastSubmittedInput
-                ? () => handleGenerateItinerary(lastSubmittedInput)
-                : undefined
-            }
-            onDismiss={() => setErrorMessage(null)}
-          />
+          <div className="mb-8">
+            <ErrorBanner
+              message={errorMessage}
+              fieldErrors={fieldErrors}
+              onRetry={
+                lastSubmittedInput
+                  ? () => handleGenerateItinerary(lastSubmittedInput)
+                  : undefined
+              }
+              onDismiss={() => setErrorMessage(null)}
+            />
+          </div>
         )}
 
-        {/* Travel Form */}
-        <div className="mb-8">
+        {/* 2. Hero Section (64px Radius Dark Card) */}
+        <HeroSection onStartPlanning={scrollToPlanner} />
+
+        {/* 3. Travel Planner Form */}
+        <div className="mb-16 sm:mb-24">
           <TravelForm
             onSubmit={handleGenerateItinerary}
             isLoading={isLoading}
+            prefillData={prefillData}
           />
         </div>
 
         {/* Loading Indicator */}
         {isLoading && (
-          <LoadingState
-            destination={lastSubmittedInput?.destination}
-            durationDays={lastSubmittedInput?.durationDays}
-          />
+          <div className="mb-16">
+            <LoadingState
+              destination={lastSubmittedInput?.destination}
+              durationDays={lastSubmittedInput?.durationDays}
+            />
+          </div>
         )}
 
-        {/* Results Area */}
+        {/* 4. Active Itinerary Results Section */}
         {!isLoading && itineraryData && (
-          <div className="animate-fade-in space-y-6">
-            <div className="flex items-center justify-between pb-2">
-              <h2 className="text-xl font-extrabold text-slate-900 tracking-tight flex items-center">
-                <Compass className="w-5 h-5 text-sky-600 mr-2" />
-                Your Trip Itinerary
-              </h2>
+          <section id="results-section" className="animate-fade-in mb-20 space-y-8 scroll-mt-28">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+              <div>
+                <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-pill bg-ocean-teal/15 text-deep-navy text-xs font-bold mb-2">
+                  <Sparkles className="w-3.5 h-3.5 text-ocean-teal" />
+                  <span>AI Plan Generated Successfully</span>
+                </div>
+                <h2 className="text-2xl sm:text-3xl font-extrabold text-charcoal-ink tracking-tight flex items-center">
+                  <Compass className="w-7 h-7 text-electric-blue mr-2.5" />
+                  Your Custom Trip Plan
+                </h2>
+              </div>
 
               <button
                 type="button"
                 onClick={handleReset}
-                className="inline-flex items-center text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors"
+                className="inline-flex items-center px-4 py-2 rounded-btn bg-slate-200/80 hover:bg-slate-300 text-charcoal-ink text-xs font-bold transition-colors cursor-pointer self-start sm:self-auto"
               >
-                <RotateCcw className="w-3.5 h-3.5 mr-1" />
-                Plan Another Trip
+                <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
+                Reset & Plan Another Trip
               </button>
             </div>
 
-            {/* Budget Summary & Transparency */}
+            {/* Budget Transparency & Breakdown */}
             <BudgetSummary
               budget={itineraryData.budget}
               travellers={lastSubmittedInput?.travellers || 1}
@@ -179,13 +268,31 @@ export const App: React.FC = () => {
               isOptimizing={isOptimizing}
             />
 
-            {/* Day-by-Day Itinerary Display */}
+            {/* Day-by-Day Itinerary Details & Photos */}
             <ItineraryDisplay data={itineraryData} images={destinationImages} />
-          </div>
+          </section>
         )}
+
+        {/* 5. Popular Destinations Grid */}
+        <PopularDestinations onSelectDestination={handleSelectPopularDestination} />
+
+        {/* 6. How TripGenie Works (3 Steps) */}
+        <HowItWorks onStartPlanning={scrollToPlanner} />
+
+        {/* 7. Core Capabilities / Features (8 Cards alternating dark & light) */}
+        <FeaturesSection />
+
+        {/* 8. AI Itinerary Interactive Showcase (Paris 4-Day Demo) */}
+        <ItineraryPreviewSection />
+
+        {/* 9. Social Proof & Testimonials */}
+        <TestimonialsSection />
+
+        {/* 10. Final Conversion CTA Section */}
+        <FinalCtaSection onStartPlanning={scrollToPlanner} />
       </main>
 
-      {/* Smart Budget Optimizer Modal */}
+      {/* 11. Smart Budget Optimizer Modal */}
       {itineraryData && (
         <BudgetOptimizerModal
           isOpen={isOptimizerOpen}
@@ -201,18 +308,29 @@ export const App: React.FC = () => {
         />
       )}
 
-      {/* Footer */}
-      <footer className="border-t border-slate-200 bg-white py-6 mt-12 text-center text-xs text-slate-500">
-        <div className="max-w-7xl mx-auto px-4">
-          <p>© {new Date().getFullYear()} TripGenie AI — Personalized AI Travel Planner.</p>
-          <p className="mt-1 text-slate-400">
-            Powered by Groq AI. Travel safely and confirm bookings independently.
-          </p>
-        </div>
-      </footer>
+      {/* 12. Authentication Modal (Login / Sign Up) */}
+      <AuthModal
+        isOpen={isAuthOpen}
+        initialMode={authMode}
+        onClose={() => setIsAuthOpen(false)}
+        onLoginSuccess={handleAuthSuccess}
+      />
+
+      {/* 13. User Dashboard Modal (Saved Trips & Preferences) */}
+      <DashboardModal
+        isOpen={isDashboardOpen}
+        onClose={() => setIsDashboardOpen(false)}
+        onLogout={handleSignOut}
+        onPlanNewTrip={() => {
+          setIsDashboardOpen(false);
+          scrollToPlanner();
+        }}
+      />
+
+      {/* 14. Global Premium Footer */}
+      <Footer onReset={handleReset} />
     </div>
   );
 };
 
 export default App;
-
