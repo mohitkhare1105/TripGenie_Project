@@ -206,7 +206,7 @@ export const App: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4">
           <p>© {new Date().getFullYear()} TripGenie AI — Personalized AI Travel Planner.</p>
           <p className="mt-1 text-slate-400">
-            Powered by Gemini AI. Travel safely and confirm bookings independently.
+            Powered by Groq AI. Travel safely and confirm bookings independently.
           </p>
         </div>
       </footer>

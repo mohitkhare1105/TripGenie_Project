@@ -120,39 +120,38 @@ The interface should include:
 |---|---|---|
 | Frontend framework | React | Component-based user interface |
 | Build tool and development server | Vite | Fast development and production builds |
-| Language | TypeScript | Type safety across the application |
+| Language | TypeScript (Frontend) / Python (Backend) | Type safety and performance |
 | Styling | Tailwind CSS | Responsive, consistent UI styling |
-| Frontend routing | React Router (when multiple pages are needed) | Page navigation |
-| Backend runtime | Node.js | Runs server-side JavaScript |
-| Backend framework | Express | HTTP API and middleware |
-| Backend language | TypeScript | Typed API implementation |
-| Input and response validation | Zod | Validate request bodies and AI response schemas |
-| Generative AI | Gemini API through the provider's supported SDK | Generates itinerary suggestions |
-| Configuration | Environment variables and `.env` for local development | Keeps secrets outside source code |
-| Testing | Vitest and React Testing Library; Supertest for API tests | Unit, component, and API testing |
+| Backend runtime | Python 3.11+ | High-performance async backend execution |
+| Backend framework | FastAPI + Uvicorn | Modern, async REST API framework |
+| Input and response validation | Pydantic v2 | Strict request and AI response schema validation |
+| Generative AI | Groq Cloud API (`openai/gpt-oss-120b`) | Ultra-fast structured itinerary generation |
+| Destination Images | Unsplash API | High-resolution landscape photography with fallback |
+| Database & Auth | Supabase PostgreSQL + Supabase Auth | User profiles, trips, preferences, and Row Level Security |
+| Configuration | Environment variables and `.env` | Keeps secrets outside source code |
+| Testing | pytest (Backend) / TypeScript compiler checks | Unit, schema, and endpoint verification |
 | Version control | Git and GitHub | Source control and collaboration |
-| Database (later phase) | MongoDB Atlas or another managed database | Saved trips and user data, when persistence is introduced |
-| Deployment | A static frontend host plus a Node-compatible backend host | Deploys frontend and API independently |
+| Deployment | Vercel (Frontend) & Render (Backend) | Independent, scalable cloud deployments |
 
-Use compatible, currently supported package versions and follow the official setup instructions for Vite, React, TypeScript, Tailwind CSS, Express, Zod, and the chosen AI SDK.
+Use compatible, currently supported package versions and follow the official setup instructions for Vite, React, TypeScript, Tailwind CSS, FastAPI, Pydantic, and Groq SDK.
 
-**Architecture decision:** The browser must communicate with the Express backend. The backend calls the AI provider. Never call the AI API directly from browser code with a secret API key.
+**Architecture decision:** The browser communicates exclusively with the FastAPI backend. The backend calls external providers (Groq, Unsplash, Supabase). Never call external AI or database service keys directly from browser code.
 
-**Database decision:** A database is not required for the first working version. Add persistence only when saved itineraries or user accounts are implemented. Do not store unnecessary personal data.
+**Database decision:** Supabase PostgreSQL manages authentication, user profiles, default preferences, and saved trips with Row Level Security.
 
 ## 6. Application Architecture and Request Flow
 
 1. The user opens the TripGenie AI React application.
 2. The user enters travel details and submits the form.
 3. React performs immediate client-side validation for usability.
-4. The frontend sends a JSON request to the Express API over HTTPS.
-5. The backend validates and normalizes the request with Zod.
-6. The backend constructs a prompt and calls the Generative AI provider using a server-side API key.
-7. The backend parses and validates the AI output against a defined schema.
-8. The backend rejects or safely handles malformed, incomplete, or out-of-range output.
-9. The backend calculates expense totals, budget differences, and per-person estimates using application code.
-10. The backend returns a consistent JSON response.
-11. React renders the itinerary and budget summary using safe text rendering.
+4. The frontend sends a JSON request to the FastAPI API over HTTPS.
+5. The backend validates and normalizes the request with Pydantic v2.
+6. The backend constructs a structured prompt and calls Groq using a server-side API key.
+7. The backend parses and validates the AI JSON output against the ItineraryResponse schema.
+8. The backend safely handles malformed or out-of-range output with bounded retries.
+9. The backend calculates expense totals, budget differences, and per-person estimates deterministically in application code.
+10. The backend returns a consistent JSON response envelope.
+11. React renders the itinerary, budget summary, and Unsplash destination photos using safe text rendering.
 12. The interface shows an appropriate error and retry option if the request fails.
 
 ### Suggested API endpoint
@@ -446,14 +445,12 @@ Do not add a database merely because it is part of a modern stack; add it when t
 
 | Phase | Tasks | Expected result |
 |---|---|---|
-| 1. Project setup | Create React + Vite + TypeScript client and Express + TypeScript server; configure environment variables | Frontend and backend run locally |
-| 2. UI and form | Build responsive travel form, loading state, validation, and result components | User can enter preferences |
-| 3. API and validation | Create the generation endpoint, Zod request schema, and consistent error handler | Requests are validated server-side |
-| 4. AI integration | Add the supported Gemini SDK, prompt builder, response parsing, and schema validation | Real AI itinerary generation works |
-| 5. Budget logic | Add deterministic expense totals, per-person estimates, and budget warnings | Budget summary is consistent and testable |
-| 6. Testing and hardening | Add unit/API/component tests, rate limits, timeouts, CORS configuration, and safe logging | Common failures are handled cleanly |
-| 7. Deployment | Deploy the frontend and backend, configure production environment variables and HTTPS | Public demo is available |
-| 8. Optional persistence | Add a database and authentication only if saved trips are required | Users can securely save and retrieve trips |
+| 1. FastAPI Foundation | Setup Python FastAPI backend, configuration, CORS, and health checks | Backend API runs locally on port 8000 |
+| 2. Supabase Integration | Add PostgreSQL schema, Supabase Auth verification, and RLS policies | Secure database and authentication |
+| 3. API & Business Logic | Implement itinerary validation, sanitization, and deterministic budget calculations | Pydantic v2 schemas and business math |
+| 4. Groq Migration | Implement Groq provider (`openai/gpt-oss-120b`) with JSON mode | High-speed AI itinerary generation |
+| 5. Frontend & Images | Connect React frontend, add Unsplash destination photography | Full visual itinerary experience |
+| 6. Deployment | Render backend deployment & Vercel frontend deployment | Production cloud ready |
 
 The timeline depends on prior experience, available time, and provider setup. Build and test one phase at a time rather than attempting every future feature in the first release.
 
@@ -512,9 +509,9 @@ Treat these as separate roadmap items. Do not present a future feature as implem
 The MVP is ready for demonstration when:
 
 - A user can enter valid travel preferences in the React interface.
-- The frontend sends a request to the Express backend.
-- The backend validates the request and calls a real Generative AI API.
-- The returned itinerary is parsed and validated against a schema.
+- The frontend sends a request to the FastAPI backend.
+- The backend validates the request and calls the Groq Cloud API.
+- The returned itinerary is parsed and validated against Pydantic schemas.
 - The itinerary displays the expected number of days and readable activities.
 - The backend calculates expense totals and budget differences.
 - AI-generated estimates are clearly labelled.
@@ -529,6 +526,8 @@ The MVP is ready for demonstration when:
 **Project name:** TripGenie AI  
 **Project type:** Modern full-stack AI travel-planning web application  
 **Frontend:** React, Vite, TypeScript, Tailwind CSS  
-**Backend:** Node.js, Express, TypeScript  
-**AI integration:** Gemini API through a supported server-side SDK  
+**Backend:** Python, FastAPI, Uvicorn, Pydantic v2
+**AI integration:** Groq API (`openai/gpt-oss-120b`) via official Python SDK
+**Database & Auth:** Supabase PostgreSQL & Supabase Auth
+**Images:** Unsplash API
 **Primary objective:** Make personalized trip planning simpler with Generative AI, reliable application-side calculations, and transparent estimates.

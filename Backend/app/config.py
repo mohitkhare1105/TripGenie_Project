@@ -23,8 +23,6 @@ class Settings(BaseSettings):
         default="http://localhost:5173",
         description="Allowed frontend origin(s), comma-separated"
     )
-    GEMINI_API_KEY: str = Field(default="", description="Google Gemini API key")
-    GEMINI_MODEL: str = Field(default="gemini-2.5-flash", description="Gemini model identifier")
 
     # Groq AI Configuration (Phase 4 Primary LLM Provider)
     GROQ_API_KEY: Optional[str] = Field(default=None, description="Groq Cloud API key")

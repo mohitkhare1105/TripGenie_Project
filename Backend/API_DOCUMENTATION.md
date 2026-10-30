@@ -245,3 +245,16 @@ TripGenie AI utilizes **Groq Cloud API** (`openai/gpt-oss-120b`) as its primary 
 - Groq output is enforced via `response_format={"type": "json_object"}` and strictly validated against Pydantic `ItineraryResponse`.
 - **Deterministic Budget Arithmetic:** Groq never calculates final financial totals; all cost calculations, category aggregation, and budget status assignments are executed deterministically on the backend via `BudgetService`.
 
+---
+
+## 6. Destination Images (Unsplash API)
+
+- **Endpoint:** `GET /api/images/destination`
+- **Query Parameters:**
+  - `query` (string, required): Destination name (e.g., `"Goa, India"`).
+  - `count` (integer, optional, default: 4): Number of images to retrieve (1–10).
+- **Behavior:**
+  - Calls Unsplash API securely server-side.
+  - Automatically provides curated high-resolution photography fallbacks if `UNSPLASH_ACCESS_KEY` is omitted or API is unavailable.
+  - Returns photographer attribution (`name`, `photographer_url`, `unsplash_url`).
+

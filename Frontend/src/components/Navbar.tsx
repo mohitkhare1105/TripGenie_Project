@@ -32,7 +32,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onReset }) => {
         <div className="flex items-center space-x-4">
           <div className="flex items-center text-xs text-slate-500">
             <Sparkles className="w-3.5 h-3.5 text-amber-500 mr-1" />
-            <span className="hidden sm:inline">Powered by Gemini AI</span>
+            <span className="hidden sm:inline">Powered by Groq AI</span>
           </div>
         </div>
       </div>

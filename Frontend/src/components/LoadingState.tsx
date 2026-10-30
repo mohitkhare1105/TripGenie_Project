@@ -8,7 +8,7 @@ interface LoadingStateProps {
 }
 
 const GENERATING_TIPS = [
-  'Consulting Gemini AI to find authentic spots and local dining...',
+  'Consulting Groq AI to find authentic spots and local dining...',
   'Organizing activities into morning, afternoon, and evening...',
   'Calculating travel pacing and reasonable rest buffers...',
   'Validating budget numbers and category breakdowns in application code...',

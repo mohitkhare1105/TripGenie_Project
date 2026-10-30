@@ -3,34 +3,34 @@ node_modules/
 Backend/node_modules/
 Frontend/node_modules/
 
-# Production builds
+# Production builds & artifacts
 dist/
 build/
-Backend/dist/
 Frontend/dist/
 *.egg-info/
 
-# Environment files
+# Environment and secret files
 .env
 .env.*
 !.env.example
-!.env.fastapi.example
 Backend/.env
 Backend/.env.*
 !Backend/.env.example
-!Backend/.env.fastapi.example
 Frontend/.env
 Frontend/.env.*
 !Frontend/.env.example
 
 # Logs
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# System files
+# System & IDE files
 .DS_Store
 Thumbs.db
+.vscode/
+.idea/
 
 # Python virtual environments
 venv/

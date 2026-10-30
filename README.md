@@ -1,27 +1,21 @@
 # TripGenie AI — Personalized AI Travel Planner
 
-**TripGenie AI** is a modern, full-stack AI-powered travel planning application that generates personalized, day-wise itineraries based on travel destination, duration, budget, number of travellers, travel style, and specific interests. 
+**TripGenie AI** is a modern, full-stack travel planning platform that generates personalized, day-wise itineraries tailored to destination, travel dates, budget, travellers count, travel style, and specific interests.
 
-The application integrates Google's official Gemini AI SDK (`@google/genai`) to generate structured day-by-day recommendations and couples this with deterministic backend calculation of financial totals, per-person costs, and category breakdowns.
+The system combines ultra-fast AI generation via **Groq Cloud API** (`openai/gpt-oss-120b`), curated landscape photography via **Unsplash API**, secure user management and persistence via **Supabase PostgreSQL & Auth**, and deterministic financial accounting calculated in backend application code.
 
 ---
 
 ## 1. Features
 
-- **Personalized Day-Wise Timeline:** Daily itineraries structured into morning, afternoon, evening, and night activities with titles, durations, categories, descriptions, locations, and suggested times.
-- **Server-Side Financial Accuracy:** Budget totals, category breakdowns (transport, accommodation, food, activities, shopping, miscellaneous), and per-person estimates are calculated strictly by backend application code rather than relying on LLM arithmetic.
-- **Smart Budget Optimizer:** Interactive optimization workflow that proposes lower-cost local alternatives (e.g., swapping private taxis for local transit or resorts for homestays) while recalculating revised totals on the server.
-- **Transparent Pricing Labels:** Clear disclaimers and status badges distinguishing AI planning estimates from live quotations (`under_budget`, `within_budget`, `over_budget`).
-- **Strict Input & Output Validation:** Complete Zod schema validation on all incoming request bodies and outgoing AI responses with bounded repair mechanisms.
-- **Enterprise-Grade Security:**
-  - HTTP security headers via Helmet (`X-Content-Type-Options: nosniff`, hidden `X-Powered-By`).
-  - Request tracing via `X-Request-ID`.
-  - Configurable CORS origin restriction.
-  - Rate limiting on expensive AI endpoints (`express-rate-limit`).
-  - Request body size limits (100kb payload cap).
-  - In-flight duplicate request debouncing.
-  - Secret redaction in server diagnostic logs.
-- **Responsive UI:** Modern React + Tailwind CSS interface supporting desktop, tablet, and mobile screen sizes.
+- **Personalized Day-Wise Timeline:** Structured daily itineraries divided into morning, afternoon, evening, and night activities with durations, categories, descriptions, locations, and suggested start times.
+- **Deterministic Financial Accounting:** Activity totals, category breakdowns (transport, accommodation, food, activities, shopping, miscellaneous), and per-person estimates are calculated authoritatively by backend code rather than relying on LLM arithmetic.
+- **Smart Budget Optimizer:** Proposes practical, lower-cost alternative activities, stays, and transit options when an itinerary exceeds the traveller's budget, recalculating revised totals on the server.
+- **Destination Photography:** Landscape destination photography with photographer attribution fetched server-side via the Unsplash API with automatic curated fallbacks.
+- **Supabase Authentication & RLS:** Secure user registration, profiles, travel preferences, and saved trips protected by PostgreSQL Row Level Security (RLS) policies.
+- **Strict Input & Output Validation:** Pydantic v2 schemas sanitize incoming request payloads and validate AI JSON responses with bounded error retries.
+- **Production Reliability:** Security headers, request tracing (`x-request-id`), 100 KB payload limits, in-flight duplicate request debouncing, and automated credential redaction in diagnostic logs.
+- **Responsive UI:** Modern React interface styled with Tailwind CSS and Lucide icons, supporting mobile, tablet, and desktop viewports.
 
 ---
 
@@ -29,409 +23,268 @@ The application integrates Google's official Gemini AI SDK (`@google/genai`) to 
 
 | Layer | Technology | Purpose |
 |---|---|---|
-| **Frontend** | React 18, Vite, TypeScript | Interactive, responsive user interface |
-| **Styling** | Tailwind CSS, Lucide Icons | Utility-first modern UI components & iconography |
-| **Backend** | Node.js, Express.js, TypeScript | REST API, middleware chain, and business logic |
-| **AI Integration** | `@google/genai` (Gemini SDK) | Official Gemini model communication (`gemini-2.5-flash`) |
-| **Validation** | Zod | Request sanitization and structured AI response validation |
-| **Testing** | Node.js Test Runner, Supertest, tsx | 86 automated end-to-end and unit tests |
-| **Security** | Helmet, express-rate-limit, CORS | Security headers, abuse prevention, origin control |
+| **Frontend** | React 18, TypeScript, Vite | Fast, responsive single-page application (SPA) |
+| **Styling** | Tailwind CSS, Lucide Icons | Modern utility-first styling and iconography |
+| **Backend** | Python 3.11+, FastAPI, Uvicorn | High-performance asynchronous REST API |
+| **Validation** | Pydantic v2, Pydantic Settings | Strict schema enforcement and environment management |
+| **AI Generation** | Groq Cloud API (`openai/gpt-oss-120b`) | Ultra-fast structured JSON itinerary generation |
+| **Images** | Unsplash API | High-resolution destination photography |
+| **Database & Auth** | Supabase (PostgreSQL + GoTrue Auth) | Relational persistence, JWT verification, and RLS |
+| **Testing** | pytest, pytest-anyio, httpx | Automated test suite (84 unit and endpoint tests) |
+| **Deployment** | Vercel (Frontend) & Render (Backend) | Independent, scalable cloud hosting |
 
 ---
 
-## 3. Project Structure
+## 3. Project Architecture
+
+```mermaid
+flowchart TD
+    User["React 18 SPA (Vite / Vercel)"] -->|"HTTPS / JSON"| FastAPIRouter["FastAPI Backend (Render)"]
+
+    subgraph Security_Middleware ["Middleware & Protection"]
+        FastAPIRouter --> SecurityHeaders["Security Headers Middleware"]
+        SecurityHeaders --> BodyLimit["100 KB Payload Limiter"]
+        BodyLimit --> DupeGuard["Duplicate In-Flight Debounce"]
+        DupeGuard --> JWTAuth["Supabase JWT Auth (Optional / Required)"]
+    end
+
+    subgraph Backend_Services ["Application Services"]
+        JWTAuth --> ItineraryService["Itinerary Service"]
+        ItineraryService --> GroqProvider["Groq AI Provider (openai/gpt-oss-120b)"]
+        ItineraryService --> BudgetService["Deterministic Budget Service"]
+        JWTAuth --> UnsplashService["Unsplash Image Service"]
+        JWTAuth --> SupabaseRepo["Supabase Repositories (Trips / Profiles)"]
+    end
+
+    subgraph External_Cloud ["External Services"]
+        GroqProvider -->|"JSON Mode"| GroqCloud["Groq Cloud API"]
+        UnsplashService -->|"Client-ID"| UnsplashAPI["Unsplash API"]
+        SupabaseRepo -->|"PostgREST / RLS"| SupabaseDB["Supabase PostgreSQL & Auth"]
+    end
+```
+
+---
+
+## 4. Repository Folder Structure
 
 ```text
 TripGenie_Project/
 ├── Backend/
-│   ├── src/
-│   │   ├── app.ts                         # Express app, middleware configuration, routes
-│   │   ├── server.ts                      # Server entry point & graceful shutdown
-│   │   ├── routes/
-│   │   │   └── itineraryRoutes.ts         # /api/itineraries route definitions
-│   │   ├── controllers/
-│   │   │   └── itineraryController.ts     # Generation & budget optimization handlers
-│   │   ├── services/
-│   │   │   ├── aiService.ts               # Gemini AI communication, retries, bounded repair
-│   │   │   ├── budgetService.ts           # Deterministic financial calculations & accounting
-│   │   │   └── budgetOptimizerService.ts  # Smart Budget Optimizer workflow
-│   │   ├── schemas/
-│   │   │   ├── itineraryRequest.ts        # Zod input validation schema
-│   │   │   ├── itineraryResponse.ts       # Zod structured AI response schema
-│   │   │   └── budgetSchema.ts            # Zod budget breakdown & optimizer schemas
-│   │   ├── middleware/
-│   │   │   ├── errorHandler.ts            # Centralized error handler (400, 404, 413, 500, etc.)
-│   │   │   ├── validateRequest.ts         # Zod body validation middleware
-│   │   │   ├── rateLimiter.ts             # In-memory endpoint rate limiter
-│   │   │   └── duplicateRequestPrevention.ts # In-flight request debouncing
-│   │   ├── utils/
-│   │   │   ├── promptBuilder.ts           # Prompt engineering & input sanitization
-│   │   │   └── logger.ts                  # Diagnostic logger with secret redaction
-│   │   └── tests/
-│   │       ├── validation.test.ts         # Request validation test suite
-│   │       ├── aiIntegration.test.ts      # Gemini AI integration test suite
-│   │       ├── budget.test.ts             # Financial accounting & optimizer test suite
-│   │       ├── security.test.ts           # Security headers, CORS, rate limits, 413 limits
-│   │       └── e2eIntegration.test.ts     # End-to-end full journey test suite
-│   ├── package.json
-│   ├── tsconfig.json
-│   └── .env.example
+│   ├── app/
+│   │   ├── api/v1/endpoints/       # FastAPI route handlers (health, itineraries, images, trips, users)
+│   │   ├── core/                   # Auth verification, exceptions, and safe logging
+│   │   ├── db/                     # Supabase client and connection management
+│   │   ├── middleware/             # Security headers, body size limit, duplicate guard
+│   │   ├── repositories/           # Database repositories (profiles, trips, preferences)
+│   │   ├── schemas/                # Pydantic v2 data models (itinerary, budget, image, user, trip)
+│   │   ├── services/               # Business logic, budget engine, optimizer, and Unsplash
+│   │   │   └── ai/                 # Groq itinerary provider and prompt engineering
+│   │   ├── utils/                  # Input sanitization and text utilities
+│   │   ├── config.py               # Application settings and environment parsing
+│   │   └── main.py                 # FastAPI application factory and lifespan
+│   ├── supabase/
+│   │   └── migrations/             # SQL migrations (profiles, trips, user_preferences, RLS)
+│   ├── tests/                      # Automated pytest suite (84 tests)
+│   ├── .env.example                # Backend environment variable template
+│   ├── pytest.ini                  # Pytest configuration
+│   ├── requirements.txt            # Python dependencies
+│   ├── run.py                      # Local development runner
+│   ├── API_DOCUMENTATION.md        # Comprehensive REST API documentation
+│   └── SUPABASE_SETUP.md           # Database setup and migration guide
 ├── Frontend/
 │   ├── src/
-│   │   ├── components/
-│   │   │   ├── Navbar.tsx                 # Header navigation & branding
-│   │   │   ├── TravelForm.tsx             # Validated travel preference input form
-│   │   │   ├── ItineraryDisplay.tsx       # Day timeline, periods, and safe text rendering
-│   │   │   ├── BudgetSummary.tsx          # Expense metrics, category cards, warnings
-│   │   │   ├── BudgetOptimizerModal.tsx   # Optimizer comparison & trade-offs modal
-│   │   │   ├── LoadingState.tsx           # Animated loading tips during AI generation
-│   │   │   └── ErrorBanner.tsx            # Contextual error alerts and retry trigger
-│   │   ├── services/
-│   │   │   └── api.ts                     # Frontend HTTP client & error mapping
-│   │   ├── types/
-│   │   │   └── index.ts                   # TypeScript interfaces matching backend schemas
-│   │   ├── App.tsx                        # Main state container & UI workflow
-│   │   ├── main.tsx                       # React application bootstrap
-│   │   └── index.css                      # Tailwind CSS directives
-│   ├── index.html
-│   ├── package.json
-│   ├── tsconfig.json
-│   ├── vite.config.ts
-│   └── .env.example
-├── features.md                            # Comprehensive functional specification
-└── README.md                              # Full setup & deployment documentation
+│   │   ├── components/             # React UI components (TravelForm, ItineraryDisplay, BudgetSummary, etc.)
+│   │   ├── services/               # API service, Supabase token injection, and image client
+│   │   ├── types/                  # TypeScript interface definitions
+│   │   ├── App.tsx                 # Root application component
+│   │   └── main.tsx                # React entry point
+│   ├── .env.example                # Frontend environment variable template
+│   ├── package.json                # Frontend dependencies and scripts
+│   ├── tailwind.config.js          # Tailwind CSS styling configuration
+│   ├── tsconfig.json               # TypeScript configuration
+│   ├── vercel.json                 # Vercel deployment routing configuration
+│   └── vite.config.ts              # Vite bundler configuration
+├── render.yaml                     # Render Blueprint deployment configuration
+└── README.md                       # Main project documentation
 ```
 
 ---
 
-## 4. Prerequisites
+## 5. Prerequisites
 
-- **Node.js:** v18.x or higher (v24.x tested and supported)
-- **npm:** v9.x or higher
-- **Gemini API Key:** An active key from [Google AI Studio](https://aistudio.google.com/)
-
----
-
-## 5. Environment Configuration
-
-### Backend Configuration (`Backend/.env`)
-
-Copy the template:
-```bash
-cp Backend/.env.example Backend/.env
-```
-
-Configure your variables:
-```env
-PORT=5000
-NODE_ENV=development
-CLIENT_ORIGIN=http://localhost:5173
-GEMINI_API_KEY=your_actual_gemini_api_key_here
-GEMINI_MODEL=gemini-2.5-flash
-RATE_LIMIT_WINDOW_MS=900000
-RATE_LIMIT_MAX_REQUESTS=20
-```
-
-> **Security Note:** `GEMINI_API_KEY` is loaded exclusively on the backend server and is never committed to Git, returned in API responses, or exposed to browser bundles.
-
-### Frontend Configuration (`Frontend/.env`)
-
-Copy the template:
-```bash
-cp Frontend/.env.example Frontend/.env
-```
-
-Configure:
-```env
-VITE_API_BASE_URL=http://localhost:5000
-```
+- **Python:** 3.11 or higher
+- **Node.js:** 18.0 or higher (with npm)
+- **Groq API Key:** From [Groq Console](https://console.groq.com/)
+- **Supabase Project:** Free tier project from [Supabase](https://supabase.com/)
+- **Unsplash Access Key (Optional):** From [Unsplash Developer Portal](https://unsplash.com/developers) *(curated fallback images are used if omitted)*
 
 ---
 
-## 6. Installation & Local Development
+## 6. Backend Setup & Run Instructions
 
-### Step 1: Install Dependencies
-
-```bash
-# Install backend dependencies
-cd Backend
-npm install
-
-# Install frontend dependencies
-cd ../Frontend
-npm install
-```
-
-### Step 2: Run in Development Mode
-
-Open two terminal sessions:
-
-**Terminal 1 (Backend API Server):**
+### 1. Set Up Python Virtual Environment
 ```bash
 cd Backend
-npm run dev
-# Server runs at http://localhost:5000
-```
-
-**Terminal 2 (Frontend React App):**
-```bash
-cd Frontend
-npm run dev
-# Frontend runs at http://localhost:5173
-```
-
-Open your browser at `http://localhost:5173` to start planning trips!
-
----
-
-## 7. Testing & Verification
-
-The project includes 86 automated tests covering validation, AI integration, financial calculations, security, and full user journeys.
-
-Run the test suite:
-```bash
-cd Backend
-npm test
-```
-
-Run TypeScript type checks:
-```bash
-# Check backend
-cd Backend
-npm run typecheck
-
-# Check frontend
-cd ../Frontend
-npm run typecheck
-```
-
----
-
-## 8. Python FastAPI Backend (Migration Phases 1, 2 & 3)
-
-As part of the Python + FastAPI migration:
-- **Phase 1:** Established the FastAPI backend foundation with security middleware, request ID tracing, and CORS.
-- **Phase 2:** Integrated **Supabase PostgreSQL & Supabase Auth** with Row Level Security (RLS), JWT verification, and persistence for user profiles, saved trips, and travel preferences.
-- **Phase 3:** Migrated **Itinerary API endpoints, Pydantic v2 validation, input sanitization, and deterministic budget calculation & optimizer logic** with a provider-independent AI interface.
-
-| Service | Port | Description |
-|---|---|---|
-| **Express Backend** | `5000` | Full legacy TypeScript backend (Parts 1–6) |
-| **FastAPI Backend** | `8000` | Modular FastAPI + Supabase backend (Phases 1–3) |
-| **React Frontend** | `5173` | Vite development server |
-
-### API Documentation & Specifications
-
-See [`Backend/API_DOCUMENTATION.md`](Backend/API_DOCUMENTATION.md) for full request/response schemas, field constraints, and error codes.
-
-### Setup FastAPI Virtual Environment
-
-```bash
-cd Backend
-
-# Create virtual environment
 python -m venv venv
 
-# Activate virtual environment
-# Windows:
-.\venv\Scripts\activate
+# Windows PowerShell:
+.\venv\Scripts\Activate.ps1
+
 # macOS/Linux:
 source venv/bin/activate
+```
 
-# Install dependencies (FastAPI, Uvicorn, Supabase, PyJWT, Cryptography)
+### 2. Install Dependencies
+```bash
 pip install -r requirements.txt
 ```
 
-### Supabase Database & Migrations
-
-See [`Backend/SUPABASE_SETUP.md`](Backend/SUPABASE_SETUP.md) for full project setup and credential instructions.
-
-Apply the version-controlled SQL migrations from `Backend/supabase/migrations/`:
-- `001_create_profiles.sql`: User profiles table with auto-creation trigger on `auth.users` and RLS.
-- `002_create_trips.sql`: Saved itineraries table, constraints, performance indexes, and RLS.
-- `003_create_user_preferences.sql`: Persistent travel preferences table with unique user constraint and RLS.
-
-### Running the FastAPI Backend
-
+### 3. Configure Environment Variables
+Create `Backend/.env` based on `Backend/.env.example`:
 ```bash
-cd Backend
+cp .env.example .env
+```
+Fill in your `GROQ_API_KEY`, `SUPABASE_URL`, and `SUPABASE_ANON_KEY`.
 
-# Using the run script (runs on port 8000 by default):
+### 4. Run the Backend Server
+```bash
 python run.py
-
-# Or directly using Uvicorn:
-uvicorn app.main:app --port 8000 --reload
 ```
-
-- **Health check endpoint:** `http://localhost:8000/api/health`
-- **Database health probe:** `http://localhost:8000/api/health/database`
-- **Itinerary generation:** `POST http://localhost:8000/api/itineraries/generate`
-- **Smart budget optimizer:** `POST http://localhost:8000/api/itineraries/optimize-budget`
-- **Interactive Swagger Docs:** `http://localhost:8000/docs`
-
-### Running FastAPI Automated Tests
-
-The test suite covers validation, sanitization, budget calculation, optimizer logic, JWT auth, database resilience, and repository CRUD:
-
+Or directly with Uvicorn:
 ```bash
-cd Backend
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+The API is available at `http://localhost:8000`. Interactive documentation is accessible at `http://localhost:8000/docs`.
 
-# Run verbose pytest suite (63 tests):
+### 5. Run Backend Tests
+```bash
 python -m pytest -v
-
-# Run short traceback pytest:
-python -m pytest --tb=short
 ```
 
 ---
 
-## 9. Production Build
+## 7. Frontend Setup & Run Instructions
 
-To build both services for production:
-
+### 1. Install Dependencies
 ```bash
-# Build Backend (compiles TypeScript to Backend/dist)
-cd Backend
+cd Frontend
+npm install
+```
+
+### 2. Configure Environment Variables
+Create `Frontend/.env` based on `Frontend/.env.example`:
+```bash
+cp .env.example .env
+```
+Verify that `VITE_API_BASE_URL` points to `http://localhost:8000`.
+
+### 3. Start the Development Server
+```bash
+npm run dev
+```
+The React application will be available at `http://localhost:5173`.
+
+### 4. Build for Production
+```bash
 npm run build
-
-# Start Production Backend Server
-npm start
-
-# Build Frontend (optimizes bundle to Frontend/dist)
-cd ../Frontend
-npm run build
-
-# Preview Frontend production build locally
-npm run preview
 ```
 
 ---
 
-## 9. API Documentation
+## 8. Environment Variables Reference
 
-### 1. Health Check
-- **Endpoint:** `GET /api/health`
-- **Description:** Verifies server process uptime without consuming Gemini quota.
-- **Response:**
-  ```json
-  {
-    "success": true,
-    "message": "TripGenie AI backend is running",
-    "data": {
-      "status": "healthy",
-      "uptime": 120,
-      "timestamp": "2026-10-30T07:00:00.000Z"
-    }
-  }
-  ```
+### Backend (`Backend/.env`)
+| Variable | Required | Description | Default / Example |
+|---|:---:|---|---|
+| `PORT` | No | Server listening port | `8000` |
+| `NODE_ENV` | Yes | Environment mode | `development` or `production` |
+| `CLIENT_ORIGIN` | Yes | Allowed frontend origin(s), comma-separated | `http://localhost:5173` |
+| `GROQ_API_KEY` | Yes | Groq Cloud API access key | `gsk_...` |
+| `GROQ_MODEL` | No | Groq LLM model name | `openai/gpt-oss-120b` |
+| `GROQ_TIMEOUT` | No | AI inference timeout (seconds) | `30.0` |
+| `UNSPLASH_ACCESS_KEY` | No | Unsplash API access key | `your_key` *(uses fallbacks if empty)* |
+| `SUPABASE_URL` | Yes | Supabase Project URL | `https://xyz.supabase.co` |
+| `SUPABASE_ANON_KEY` | Yes | Supabase public anonymous key | `eyJhbGciOi...` |
+| `SUPABASE_SERVICE_ROLE_KEY` | No | Supabase service-role administrative key | `eyJhbGciOi...` |
+| `SUPABASE_JWT_SECRET` | No | Secret for fast symmetric JWT verification | `your_jwt_secret` |
+| `MAX_BODY_SIZE_BYTES` | No | Request body size limit in bytes | `102400` (100 KB) |
+| `RATE_LIMIT_MAX_REQUESTS` | No | Maximum requests per 15-minute window | `20` |
 
-### 2. Generate Itinerary
-- **Endpoint:** `POST /api/itineraries/generate`
-- **Rate Limit:** 20 requests per 15 minutes per IP
-- **Payload:**
-  ```json
-  {
-    "destination": "Manali",
-    "durationDays": 3,
-    "budget": 10000,
-    "travellers": 2,
-    "travelStyle": "adventure",
-    "interests": ["nature", "trekking", "local food"],
-    "accommodationPreference": "budget",
-    "transportPreference": "public transport"
-  }
-  ```
-- **Response:**
-  ```json
-  {
-    "success": true,
-    "message": "Itinerary generated successfully",
-    "data": {
-      "trip": { "destination": "Manali", "durationDays": 3, "currency": "INR" },
-      "days": [ ... ],
-      "budget": {
-        "currency": "INR",
-        "userBudget": 10000,
-        "categoryTotals": {
-          "transport": 400,
-          "accommodation": 2500,
-          "food": 1200,
-          "activities": 1800,
-          "shopping": 1000,
-          "miscellaneous": 0
-        },
-        "estimatedTotal": 6900,
-        "difference": 3100,
-        "estimatedPerPerson": 3450,
-        "status": "under_budget",
-        "isComplete": true
-      },
-      "notes": [ ... ]
-    }
-  }
-  ```
-
-### 3. Optimize Budget
-- **Endpoint:** `POST /api/itineraries/optimize-budget`
-- **Description:** Proposes lower-cost itinerary alternatives when costs exceed the target budget.
-- **Payload:**
-  ```json
-  {
-    "itinerary": { ... },
-    "userBudget": 5000,
-    "travellers": 2,
-    "travelStyle": "adventure"
-  }
-  ```
-- **Response:**
-  ```json
-  {
-    "success": true,
-    "message": "Budget optimization completed",
-    "data": {
-      "originalBudget": { ... },
-      "optimizedItinerary": { ... },
-      "optimizedBudget": { ... },
-      "savings": 5200,
-      "achievedTarget": true,
-      "tradeOffs": [ ... ]
-    }
-  }
-  ```
+### Frontend (`Frontend/.env`)
+| Variable | Required | Description | Example |
+|---|:---:|---|---|
+| `VITE_API_BASE_URL` | Yes | Base URL of the FastAPI backend | `http://localhost:8000` (Local) / `https://tripgenie-backend.onrender.com` (Production) |
 
 ---
 
-## 10. Deployment Instructions
+## 9. API Endpoint Overview
 
-Frontend and Backend can be deployed independently to modern cloud platforms:
+| Method | Endpoint | Auth | Purpose |
+|---|---|:---:|---|
+| `GET` | `/api/health` | Public | Server uptime and health probe |
+| `GET` | `/api/health/database` | Public | Diagnostic database connection probe |
+| `POST` | `/api/itineraries/generate` | Optional | Generate itinerary & compute deterministic budget |
+| `POST` | `/api/itineraries/optimize-budget` | Optional | Propose cost-saving itinerary alternatives |
+| `GET` | `/api/images/destination` | Optional | Retrieve Unsplash destination photography |
+| `GET` | `/api/users/me` | Bearer | Retrieve authenticated user profile |
+| `PUT` | `/api/users/me/profile` | Bearer | Update user profile |
+| `GET` | `/api/users/me/preferences` | Bearer | Retrieve user travel preferences |
+| `PUT` | `/api/users/me/preferences` | Bearer | Upsert user travel preferences |
+| `GET` | `/api/trips` | Bearer | List user's saved trips (paginated) |
+| `POST` | `/api/trips` | Bearer | Save a new trip itinerary |
+| `GET` | `/api/trips/{trip_id}` | Bearer | Retrieve single saved trip by ID |
+| `PUT` | `/api/trips/{trip_id}` | Bearer | Update an existing saved trip |
+| `DELETE` | `/api/trips/{trip_id}` | Bearer | Delete a saved trip |
 
-### Backend Deployment (Render, Railway, or Google Cloud Run)
-1. Set the root directory to `Backend`.
-2. Build command: `npm install && npm run build`
-3. Start command: `npm start`
-4. Configure environment variables in your platform dashboard:
-   - `PORT=5000` (or platform default)
-   - `NODE_ENV=production`
-   - `CLIENT_ORIGIN=https://your-frontend-domain.com`
-   - `GEMINI_API_KEY=your_gemini_api_key`
-   - `GEMINI_MODEL=gemini-2.5-flash`
-
-### Frontend Deployment (Vercel, Netlify, or Cloudflare Pages)
-1. Set the root directory to `Frontend`.
-2. Build command: `npm install && npm run build`
-3. Output directory: `dist`
-4. Set environment variable:
-   - `VITE_API_BASE_URL=https://your-backend-api-domain.com`
+For detailed request payloads and response envelopes, see [`Backend/API_DOCUMENTATION.md`](Backend/API_DOCUMENTATION.md).
 
 ---
 
-## 11. Troubleshooting
+## 10. Supabase Database Configuration
 
-- **CORS Error in Browser:**
-  Ensure `CLIENT_ORIGIN` in `Backend/.env` matches the exact URL of your frontend (e.g., `http://localhost:5173`).
-- **HTTP 429 Too Many Requests:**
-  Rate limiting has triggered. Wait for the window to reset or adjust `RATE_LIMIT_MAX_REQUESTS` in `Backend/.env`.
-- **HTTP 503 Missing Gemini API Key:**
-  Verify that `GEMINI_API_KEY` is defined in `Backend/.env` and that the backend server was restarted after setting it.
-- **HTTP 413 Payload Too Large:**
-  The request exceeds the 100kb body limit. Reduce oversized custom notes or array lengths.
+The application uses PostgreSQL with Row Level Security (RLS) managed through three migration scripts in [`Backend/supabase/migrations/`](Backend/supabase/migrations/):
+
+1. `001_create_profiles.sql`: Creates `profiles` table linked to Supabase Auth (`auth.users`) with auto-creation trigger.
+2. `002_create_trips.sql`: Creates `trips` table for saving itineraries with ownership validation.
+3. `003_create_user_preferences.sql`: Creates `user_preferences` table storing default travel styles.
+
+To execute migrations, navigate to your Supabase project dashboard $\to$ **SQL Editor**, and execute the scripts in order. For detailed instructions, refer to [`Backend/SUPABASE_SETUP.md`](Backend/SUPABASE_SETUP.md).
+
+---
+
+## 11. Deployment Instructions
+
+### Backend Deployment (Render)
+1. Fork or push this repository to GitHub.
+2. In the Render Dashboard, create a **New Blueprint Instance** and select your repository. Render automatically reads [`render.yaml`](render.yaml).
+3. Alternatively, create a **Web Service**:
+   - **Root Directory:** `Backend`
+   - **Environment:** `Python 3`
+   - **Build Command:** `pip install -r requirements.txt`
+   - **Start Command:** `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+   - **Health Check Path:** `/api/health`
+4. Set the required environment variables (`GROQ_API_KEY`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `CLIENT_ORIGIN`, `NODE_ENV=production`).
+
+### Frontend Deployment (Vercel)
+1. In the Vercel Dashboard, import the repository.
+2. Configure project settings:
+   - **Root Directory:** `Frontend`
+   - **Framework Preset:** `Vite`
+   - **Build Command:** `npm run build`
+   - **Output Directory:** `dist`
+3. Add the environment variable:
+   - `VITE_API_BASE_URL`: `https://your-backend-service.onrender.com`
+4. Deploy. Vercel automatically applies [`Frontend/vercel.json`](Frontend/vercel.json) rewrite rules for SPA client routing.
+
+---
+
+## 12. Basic Troubleshooting
+
+- **CORS Error (`Origin Not Allowed`):**
+  Ensure the frontend URL is included in `CLIENT_ORIGIN` in the backend environment variables.
+- **HTTP 503 (`AI service unavailable`):**
+  Ensure `GROQ_API_KEY` is set in `Backend/.env` and the server was restarted.
+- **HTTP 413 (`Payload too large`):**
+  The server enforces a strict 100 KB payload limit (`MAX_BODY_SIZE_BYTES`).
+- **Database Connection Failure:**
+  Verify `SUPABASE_URL` and `SUPABASE_ANON_KEY`. Check `/api/health/database` for diagnostic connection details.

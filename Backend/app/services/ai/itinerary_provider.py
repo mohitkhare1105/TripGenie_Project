@@ -29,7 +29,7 @@ class AiServiceUnavailableError(AppException):
 class ItineraryProvider(ABC):
     """
     Provider-agnostic interface for AI itinerary generation and optimization.
-    Decouples business logic from external LLM providers (e.g. Gemini, Groq).
+    Decouples business logic from external LLM providers (e.g. Groq Cloud).
     """
 
     @abstractmethod
