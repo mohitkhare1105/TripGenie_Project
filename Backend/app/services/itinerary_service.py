@@ -1,7 +1,9 @@
 from typing import Optional
+from app.config import settings
 from app.schemas.itinerary import ItineraryRequest, GeneratedItineraryData
 from app.services.budget_service import BudgetService, budget_service
 from app.services.ai.itinerary_provider import ItineraryProvider, UnconfiguredItineraryProvider
+from app.services.ai.groq_provider import GroqItineraryProvider
 
 
 class ItineraryService:
@@ -14,7 +16,12 @@ class ItineraryService:
         provider: Optional[ItineraryProvider] = None,
         budget_srv: Optional[BudgetService] = None,
     ):
-        self.provider = provider or UnconfiguredItineraryProvider()
+        if provider is not None:
+            self.provider = provider
+        elif settings.is_groq_configured:
+            self.provider = GroqItineraryProvider()
+        else:
+            self.provider = UnconfiguredItineraryProvider()
         self.budget_srv = budget_srv or budget_service
 
     def set_provider(self, provider: ItineraryProvider) -> None:

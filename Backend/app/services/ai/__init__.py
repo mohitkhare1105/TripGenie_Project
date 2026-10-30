@@ -4,11 +4,13 @@ from .itinerary_provider import (
     AiServiceError,
     AiServiceUnavailableError,
 )
+from .groq_provider import GroqItineraryProvider
 
 __all__ = [
     "ItineraryProvider",
     "UnconfiguredItineraryProvider",
     "AiServiceError",
     "AiServiceUnavailableError",
+    "GroqItineraryProvider",
 ]
 

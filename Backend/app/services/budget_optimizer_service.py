@@ -1,9 +1,11 @@
 import json
 from typing import Optional, Tuple
+from app.config import settings
 from app.schemas.itinerary import ItineraryResponse
 from app.schemas.budget import OptimizeBudgetRequest, OptimizeBudgetResponse
 from app.services.budget_service import BudgetService, budget_service
 from app.services.ai.itinerary_provider import ItineraryProvider, UnconfiguredItineraryProvider
+from app.services.ai.groq_provider import GroqItineraryProvider
 
 
 def build_optimization_prompt(
@@ -58,8 +60,19 @@ class BudgetOptimizerService:
         provider: Optional[ItineraryProvider] = None,
         budget_srv: Optional[BudgetService] = None,
     ):
-        self.provider = provider or UnconfiguredItineraryProvider()
+        if provider is not None:
+            self.provider = provider
+        elif settings.is_groq_configured:
+            self.provider = GroqItineraryProvider()
+        else:
+            self.provider = UnconfiguredItineraryProvider()
         self.budget_srv = budget_srv or budget_service
+
+    def set_provider(self, provider: ItineraryProvider) -> None:
+        """
+        Allows runtime dependency injection of AI provider (used in unit tests).
+        """
+        self.provider = provider
 
     async def optimize_budget(self, request: OptimizeBudgetRequest) -> OptimizeBudgetResponse:
         # 1. Deterministically calculate original budget in backend

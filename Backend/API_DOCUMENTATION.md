@@ -218,13 +218,30 @@ This document provides complete technical specifications for the TripGenie AI ba
   }
   ```
 
-- **503 Service Unavailable (Phase 3 AI Boundary):**
+- **503 Service Unavailable (AI Provider Unconfigured):**
   ```json
   {
     "success": false,
-    "message": "AI itinerary generation provider is not configured for Phase 3. Real AI provider integration is scheduled for Phase 4.",
+    "message": "Groq AI service is not configured. Please set GROQ_API_KEY in environment.",
     "data": null,
     "errors": null
   }
   ```
+
+---
+
+## 5. Phase 4: Groq AI Provider Integration
+
+TripGenie AI utilizes **Groq Cloud API** (`llama-3.3-70b-versatile`) as its primary LLM provider for fast, structured itinerary generation and budget optimization via JSON mode.
+
+### 5.1 Configuration
+- `GROQ_API_KEY`: Groq Cloud API key (`gsk_...`)
+- `GROQ_MODEL`: Model name (default: `llama-3.3-70b-versatile`)
+- `GROQ_TIMEOUT`: Request timeout in seconds (default: `30.0`)
+- `GROQ_MAX_RETRIES`: Number of bounded retries for transient errors (default: `1`)
+
+### 5.2 Provider-Independent Architecture
+- `ItineraryProvider` abstract base class decouples LLM generation from application logic.
+- Groq output is enforced via `response_format={"type": "json_object"}` and strictly validated against Pydantic `ItineraryResponse`.
+- **Deterministic Budget Arithmetic:** Groq never calculates final financial totals; all cost calculations, category aggregation, and budget status assignments are executed deterministically on the backend via `BudgetService`.
 

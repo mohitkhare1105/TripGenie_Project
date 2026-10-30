@@ -4,11 +4,11 @@ import sys
 from typing import Any, Dict
 
 # Regex patterns for sensitive credentials
-API_KEY_PATTERN = re.compile(r"(AIza[0-9A-Za-z-_]{35}|AQ\.[A-Za-z0-9_-]+|sbp_[a-zA-Z0-9]{20,})")
+API_KEY_PATTERN = re.compile(r"(AIza[0-9A-Za-z-_]{35}|AQ\.[A-Za-z0-9_-]+|sbp_[a-zA-Z0-9]{20,}|gsk_[a-zA-Z0-9]{20,})")
 AUTH_HEADER_PATTERN = re.compile(r"Bearer\s+[A-Za-z0-9\-._~+/]+=*", re.IGNORECASE)
 JWT_PATTERN = re.compile(r"eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}")
 KEY_VALUE_PATTERN = re.compile(
-    r'("?(?:apiKey|password|secret|key|token|supabase_key|service_role_key)"?\s*[:=]\s*)"?[^",\s]+"?(?=,|\s|"|$)',
+    r'("?(?:apiKey|password|secret|key|token|supabase_key|service_role_key|groq_api_key)"?\s*[:=]\s*)"?[^",\s]+"?(?=,|\s|"|$)',
     re.IGNORECASE
 )
 

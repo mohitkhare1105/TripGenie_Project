@@ -25,6 +25,13 @@ class Settings(BaseSettings):
     )
     GEMINI_API_KEY: str = Field(default="", description="Google Gemini API key")
     GEMINI_MODEL: str = Field(default="gemini-2.5-flash", description="Gemini model identifier")
+
+    # Groq AI Configuration (Phase 4 Primary LLM Provider)
+    GROQ_API_KEY: Optional[str] = Field(default=None, description="Groq Cloud API key")
+    GROQ_MODEL: str = Field(default="llama-3.3-70b-versatile", description="Default Groq LLM model")
+    GROQ_TIMEOUT: float = Field(default=30.0, description="Groq API timeout in seconds")
+    GROQ_MAX_RETRIES: int = Field(default=1, description="Max retries for transient Groq errors")
+
     MAX_BODY_SIZE_BYTES: int = Field(default=102400, description="Max request body size in bytes (100 KB limit)")
     RATE_LIMIT_WINDOW_MS: int = Field(default=900000, description="Rate limit window in milliseconds")
     RATE_LIMIT_MAX_REQUESTS: int = Field(default=20, description="Maximum requests per rate limit window")
@@ -43,6 +50,11 @@ class Settings(BaseSettings):
     def is_supabase_configured(self) -> bool:
         """Indicates whether minimal Supabase client credentials are present."""
         return bool(self.SUPABASE_URL and self.SUPABASE_ANON_KEY)
+
+    @property
+    def is_groq_configured(self) -> bool:
+        """Indicates whether Groq API key is configured."""
+        return bool(self.GROQ_API_KEY and self.GROQ_API_KEY.strip())
 
     @property
     def server_port(self) -> int:
