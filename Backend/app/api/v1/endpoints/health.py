@@ -12,8 +12,9 @@ router = APIRouter()
 _PROCESS_START_TIME = time.time()
 
 
-@router.get(
+@router.api_route(
     "/health",
+    methods=["GET", "HEAD"],
     response_model=ApiResponse[HealthData],
     summary="Health check endpoint",
     description="Returns server status, uptime in seconds, and UTC ISO timestamp.",

@@ -26,8 +26,10 @@ import {
   generateItinerary,
   optimizeBudget,
   fetchDestinationImages,
+  saveUserTrip,
   ApiError,
 } from './services/api';
+import { SavedTripRecord } from './types';
 import { Compass, RotateCcw, Sparkles } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -51,6 +53,10 @@ export const App: React.FC = () => {
   const [isOptimizing, setIsOptimizing] = useState<boolean>(false);
   const [optimizationResult, setOptimizationResult] =
     useState<OptimizeBudgetResponseData | null>(null);
+
+  // Saved Trip State
+  const [isSavingTrip, setIsSavingTrip] = useState<boolean>(false);
+  const [isTripSaved, setIsTripSaved] = useState<boolean>(false);
 
   // Auth & Dashboard States
   const [isAuthOpen, setIsAuthOpen] = useState<boolean>(false);
@@ -166,6 +172,47 @@ export const App: React.FC = () => {
   const handleApplyOptimization = (optimizedData: ItineraryData) => {
     setItineraryData(optimizedData);
     setOptimizationResult(null);
+    setIsTripSaved(false);
+  };
+
+  const handleSaveTrip = async () => {
+    if (!itineraryData || !lastSubmittedInput) return;
+    if (!userEmail) {
+      setAuthMode('signup');
+      setIsAuthOpen(true);
+      return;
+    }
+
+    setIsSavingTrip(true);
+    try {
+      await saveUserTrip({
+        destination: itineraryData.trip.destination,
+        duration_days: itineraryData.trip.durationDays,
+        budget: Number(itineraryData.budget.userBudget),
+        currency: itineraryData.trip.currency || 'INR',
+        travellers: Number(lastSubmittedInput.travellers),
+        travel_style: lastSubmittedInput.travelStyle,
+        starting_city: lastSubmittedInput.startingCity,
+        travel_preferences: {
+          interests: lastSubmittedInput.interests,
+          accommodation: lastSubmittedInput.accommodationPreference,
+          transport: lastSubmittedInput.transportPreference,
+          dietary: lastSubmittedInput.dietaryPreferences,
+        },
+        itinerary_data: {
+          trip: itineraryData.trip,
+          days: itineraryData.days,
+          budget: itineraryData.budget,
+          notes: itineraryData.notes,
+        },
+        status: 'planned',
+      });
+      setIsTripSaved(true);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Failed to save itinerary to your account.');
+    } finally {
+      setIsSavingTrip(false);
+    }
   };
 
   const handleReset = () => {
@@ -174,6 +221,7 @@ export const App: React.FC = () => {
     setErrorMessage(null);
     setFieldErrors(undefined);
     setOptimizationResult(null);
+    setIsTripSaved(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -269,7 +317,13 @@ export const App: React.FC = () => {
             />
 
             {/* Day-by-Day Itinerary Details & Photos */}
-            <ItineraryDisplay data={itineraryData} images={destinationImages} />
+            <ItineraryDisplay
+              data={itineraryData}
+              images={destinationImages}
+              onSaveTrip={handleSaveTrip}
+              isSaving={isSavingTrip}
+              isSaved={isTripSaved}
+            />
           </section>
         )}
 
@@ -324,6 +378,15 @@ export const App: React.FC = () => {
         onPlanNewTrip={() => {
           setIsDashboardOpen(false);
           scrollToPlanner();
+        }}
+        onSelectTrip={(savedTrip: SavedTripRecord) => {
+          if (savedTrip.itinerary_data && typeof savedTrip.itinerary_data === 'object' && 'trip' in savedTrip.itinerary_data) {
+            setItineraryData(savedTrip.itinerary_data as ItineraryData);
+            setIsTripSaved(true);
+            setTimeout(() => {
+              document.getElementById('results-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 100);
+          }
         }}
       />
 

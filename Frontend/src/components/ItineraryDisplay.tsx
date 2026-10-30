@@ -17,11 +17,16 @@ import {
   Info,
   ShieldAlert,
   Camera,
+  Bookmark,
+  Check,
 } from 'lucide-react';
 
 interface ItineraryDisplayProps {
   data: ItineraryData;
   images?: DestinationImagesData | null;
+  onSaveTrip?: () => void;
+  isSaving?: boolean;
+  isSaved?: boolean;
 }
 
 const PERIOD_CONFIG: Record<
@@ -53,6 +58,9 @@ const PERIOD_CONFIG: Record<
 export const ItineraryDisplay: React.FC<ItineraryDisplayProps> = ({
   data,
   images,
+  onSaveTrip,
+  isSaving = false,
+  isSaved = false,
 }) => {
   const { trip, days, notes } = data;
 
@@ -106,28 +114,50 @@ export const ItineraryDisplay: React.FC<ItineraryDisplayProps> = ({
               </p>
             </div>
 
-            {heroImage?.photographer_name && (
-              <div className="text-[11px] text-slate-300 backdrop-blur-sm bg-black/40 px-2.5 py-1 rounded-md self-end sm:self-auto border border-white/10">
-                Photo by{' '}
-                <a
-                  href={`${heroImage.photographer_url}?utm_source=tripgenie_ai&utm_medium=referral`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="underline hover:text-white transition-colors"
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+              {onSaveTrip && (
+                <button
+                  type="button"
+                  onClick={onSaveTrip}
+                  disabled={isSaving || isSaved}
+                  className={`inline-flex items-center px-4 py-2.5 rounded-btn text-xs font-bold transition-all shadow-md cursor-pointer ${
+                    isSaved
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-white hover:bg-slate-100 text-charcoal-ink'
+                  }`}
                 >
-                  {heroImage.photographer_name}
-                </a>{' '}
-                on{' '}
-                <a
-                  href="https://unsplash.com/?utm_source=tripgenie_ai&utm_medium=referral"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="underline hover:text-white transition-colors"
-                >
-                  Unsplash
-                </a>
-              </div>
-            )}
+                  {isSaved ? (
+                    <Check className="w-4 h-4 mr-1.5 text-white" />
+                  ) : (
+                    <Bookmark className="w-4 h-4 mr-1.5 text-coral-pulse" />
+                  )}
+                  {isSaving ? 'Saving...' : isSaved ? 'Saved to Dashboard' : 'Save Itinerary'}
+                </button>
+              )}
+
+              {heroImage?.photographer_name && (
+                <div className="text-[11px] text-slate-300 backdrop-blur-sm bg-black/40 px-2.5 py-1.5 rounded-md border border-white/10">
+                  Photo by{' '}
+                  <a
+                    href={`${heroImage.photographer_url}?utm_source=tripgenie_ai&utm_medium=referral`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline hover:text-white transition-colors"
+                  >
+                    {heroImage.photographer_name}
+                  </a>{' '}
+                  on{' '}
+                  <a
+                    href="https://unsplash.com/?utm_source=tripgenie_ai&utm_medium=referral"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline hover:text-white transition-colors"
+                  >
+                    Unsplash
+                  </a>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

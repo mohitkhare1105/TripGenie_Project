@@ -4,11 +4,14 @@ import {
   ItineraryData,
   OptimizeBudgetResponseData,
   DestinationImagesData,
+  SavedTripRecord,
+  TripListResult,
+  UserProfileData,
 } from '../types';
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '') ||
-  'http://localhost:8000';
+  'https://tripgenie-project.onrender.com';
 
 export class ApiError extends Error {
   public statusCode: number;
@@ -44,7 +47,7 @@ export function getAuthToken(): string | null {
     // Scan localStorage for Supabase JS SDK session keys (e.g. sb-xyz-auth-token)
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key && (key.startsWith('sb-') && key.endsWith('-auth-token'))) {
+      if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
         const item = JSON.parse(localStorage.getItem(key) || '{}');
         if (item?.access_token) return item.access_token;
       }
@@ -237,5 +240,116 @@ export async function fetchDestinationImages(
   } catch {
     // Non-fatal: if images fail, return empty list without disrupting itinerary view
     return { query: destination, images: [] };
+  }
+}
+
+/**
+ * Saves a generated trip itinerary to Supabase via FastAPI backend
+ */
+export async function saveUserTrip(
+  payload: {
+    destination: string;
+    duration_days: number;
+    budget: number;
+    currency?: string;
+    travellers: number;
+    travel_style: string;
+    starting_city?: string;
+    travel_preferences?: Record<string, unknown>;
+    itinerary_data: Record<string, unknown>;
+    status?: string;
+  },
+  authToken?: string
+): Promise<SavedTripRecord> {
+  const token = authToken || getAuthToken();
+  if (!token) {
+    throw new ApiError('Authentication required. Please sign in to save your trip.', 401);
+  }
+
+  const res = await fetch(`${API_BASE_URL}/api/trips`, {
+    method: 'POST',
+    headers: buildHeaders(token),
+    body: JSON.stringify(payload),
+  });
+
+  const json: ApiResponse<SavedTripRecord> = await res.json().catch(() => ({
+    success: false,
+    message: 'Invalid response from server',
+    data: null,
+  }));
+
+  if (!res.ok || !json.success || !json.data) {
+    throw new ApiError(json.message || 'Failed to save trip', res.status);
+  }
+
+  return json.data;
+}
+
+/**
+ * Fetches all saved trips for the authenticated user from Supabase
+ */
+export async function fetchUserTrips(
+  authToken?: string,
+  limit: number = 50,
+  offset: number = 0
+): Promise<TripListResult> {
+  const token = authToken || getAuthToken();
+  if (!token) {
+    return { items: [], total: 0 };
+  }
+
+  const res = await fetch(`${API_BASE_URL}/api/trips?limit=${limit}&offset=${offset}`, {
+    method: 'GET',
+    headers: buildHeaders(token),
+  });
+
+  if (!res.ok) {
+    throw new ApiError('Failed to fetch saved trips', res.status);
+  }
+
+  const json: ApiResponse<TripListResult> = await res.json();
+  if (json.success && json.data) {
+    return json.data;
+  }
+  return { items: [], total: 0 };
+}
+
+/**
+ * Deletes a saved trip by ID
+ */
+export async function deleteUserTrip(tripId: string, authToken?: string): Promise<void> {
+  const token = authToken || getAuthToken();
+  if (!token) {
+    throw new ApiError('Authentication required to delete trip', 401);
+  }
+
+  const res = await fetch(`${API_BASE_URL}/api/trips/${tripId}`, {
+    method: 'DELETE',
+    headers: buildHeaders(token),
+  });
+
+  if (!res.ok) {
+    throw new ApiError('Failed to delete trip', res.status);
+  }
+}
+
+/**
+ * Retrieves the current user's profile from Supabase via FastAPI backend
+ */
+export async function fetchUserProfile(authToken?: string): Promise<UserProfileData | null> {
+  const token = authToken || getAuthToken();
+  if (!token) return null;
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/users/me`, {
+      method: 'GET',
+      headers: buildHeaders(token),
+    });
+
+    if (!res.ok) return null;
+    const json: ApiResponse<UserProfileData> = await res.json();
+    return json.data;
+  } catch {
+    return null;
   }
 }

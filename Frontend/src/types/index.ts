@@ -53,13 +53,17 @@ export interface ActivityItem {
   title: string;
   description: string;
   category: ActivityCategory;
-  durationMinutes?: number;
+  durationMinutes?: number | null;
   estimatedCost?: number | null;
   costStatus?: CostStatus;
   pricingType?: 'group' | 'per_person';
-  expenseCategory?: string;
-  location?: string;
-  suggestedTime?: string;
+  location?: string | null;
+  suggestedTime?: string | null;
+  expenseCategory?: string | null;
+  // Fallback compatibility properties
+  time?: string;
+  activity?: string;
+  notes?: string;
 }
 
 export interface DayPlan {
@@ -74,14 +78,6 @@ export interface TripSummary {
   currency: string;
 }
 
-export type BudgetCategory =
-  | 'transport'
-  | 'accommodation'
-  | 'food'
-  | 'activities'
-  | 'shopping'
-  | 'miscellaneous';
-
 export interface CategoryTotals {
   transport: number;
   accommodation: number;
@@ -91,8 +87,6 @@ export interface CategoryTotals {
   miscellaneous: number;
 }
 
-export type BudgetStatus = 'under_budget' | 'within_budget' | 'over_budget';
-
 export interface BudgetBreakdown {
   currency: string;
   userBudget: number;
@@ -100,10 +94,12 @@ export interface BudgetBreakdown {
   estimatedTotal: number;
   difference: number;
   estimatedPerPerson: number;
-  status: BudgetStatus;
-  isComplete: boolean;
-  unestimatedCategories: BudgetCategory[];
+  status: 'within_budget' | 'under_budget' | 'over_budget';
+  isComplete?: boolean;
+  unestimatedCategories?: string[];
   warning?: string | null;
+  perPersonTotal?: number;
+  perDayTotal?: number;
 }
 
 export interface ItineraryData {
@@ -149,3 +145,32 @@ export interface DestinationImagesData {
   primary_image?: DestinationImage | null;
 }
 
+export interface SavedTripRecord {
+  id: string;
+  user_id: string;
+  destination: string;
+  duration_days: number;
+  budget: number;
+  currency: string;
+  travellers: number;
+  travel_style: string;
+  starting_city?: string | null;
+  travel_preferences?: Record<string, unknown>;
+  itinerary_data?: ItineraryData | Record<string, unknown>;
+  status: string;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface TripListResult {
+  items: SavedTripRecord[];
+  total: number;
+}
+
+export interface UserProfileData {
+  id: string;
+  email: string;
+  full_name?: string | null;
+  avatar_url?: string | null;
+  created_at?: string;
+}
