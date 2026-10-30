@@ -232,11 +232,11 @@ This document provides complete technical specifications for the TripGenie AI ba
 
 ## 5. Phase 4: Groq AI Provider Integration
 
-TripGenie AI utilizes **Groq Cloud API** (`llama-3.3-70b-versatile`) as its primary LLM provider for fast, structured itinerary generation and budget optimization via JSON mode.
+TripGenie AI utilizes **Groq Cloud API** (`openai/gpt-oss-120b`) as its primary LLM provider for fast, structured itinerary generation and budget optimization via JSON mode.
 
 ### 5.1 Configuration
 - `GROQ_API_KEY`: Groq Cloud API key (`gsk_...`)
-- `GROQ_MODEL`: Model name (default: `llama-3.3-70b-versatile`)
+- `GROQ_MODEL`: Model name (default: `openai/gpt-oss-120b`)
 - `GROQ_TIMEOUT`: Request timeout in seconds (default: `30.0`)
 - `GROQ_MAX_RETRIES`: Number of bounded retries for transient errors (default: `1`)
 

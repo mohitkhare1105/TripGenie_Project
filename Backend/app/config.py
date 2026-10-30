@@ -28,7 +28,7 @@ class Settings(BaseSettings):
 
     # Groq AI Configuration (Phase 4 Primary LLM Provider)
     GROQ_API_KEY: Optional[str] = Field(default=None, description="Groq Cloud API key")
-    GROQ_MODEL: str = Field(default="llama-3.3-70b-versatile", description="Default Groq LLM model")
+    GROQ_MODEL: str = Field(default="openai/gpt-oss-120b", description="Default Groq LLM model")
     GROQ_TIMEOUT: float = Field(default=30.0, description="Groq API timeout in seconds")
     GROQ_MAX_RETRIES: int = Field(default=1, description="Max retries for transient Groq errors")
 

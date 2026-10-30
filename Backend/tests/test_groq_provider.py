@@ -138,6 +138,12 @@ def test_groq_provider_unconfigured_raises_503(sample_request):
     assert "not configured" in exc_info.value.message
 
 
+def test_groq_provider_default_model_from_config():
+    provider = GroqItineraryProvider()
+    assert provider.model == "openai/gpt-oss-120b"
+
+
+
 def test_groq_provider_custom_initialization():
     provider = GroqItineraryProvider(
         api_key="gsk_test12345678901234567890",
