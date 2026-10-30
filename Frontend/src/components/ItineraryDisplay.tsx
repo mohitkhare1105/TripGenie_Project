@@ -1,5 +1,10 @@
 import React from 'react';
-import { ItineraryData, ActivityItem, ActivityPeriod } from '../types';
+import {
+  ItineraryData,
+  ActivityItem,
+  ActivityPeriod,
+  DestinationImagesData,
+} from '../types';
 import {
   Calendar,
   Clock,
@@ -11,10 +16,12 @@ import {
   Moon,
   Info,
   ShieldAlert,
+  Camera,
 } from 'lucide-react';
 
 interface ItineraryDisplayProps {
   data: ItineraryData;
+  images?: DestinationImagesData | null;
 }
 
 const PERIOD_CONFIG: Record<
@@ -43,7 +50,10 @@ const PERIOD_CONFIG: Record<
   },
 };
 
-export const ItineraryDisplay: React.FC<ItineraryDisplayProps> = ({ data }) => {
+export const ItineraryDisplay: React.FC<ItineraryDisplayProps> = ({
+  data,
+  images,
+}) => {
   const { trip, days, notes } = data;
 
   const formatCost = (item: ActivityItem) => {
@@ -61,25 +71,102 @@ export const ItineraryDisplay: React.FC<ItineraryDisplayProps> = ({ data }) => {
     return 'Cost unestimated';
   };
 
+  const heroImage = images?.primary_image;
+
   return (
     <div className="space-y-8">
-      {/* Trip Header Banner */}
-      <div className="bg-gradient-to-r from-sky-600 via-indigo-600 to-indigo-700 rounded-2xl p-6 sm:p-8 text-white shadow-md">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <div className="inline-flex items-center px-3 py-1 rounded-full bg-white/15 backdrop-blur-sm text-xs font-medium mb-3">
-              <Calendar className="w-3.5 h-3.5 mr-1.5" />
-              {trip.durationDays} Days Itinerary
+      {/* Trip Header Banner with Unsplash Destination Image */}
+      <div
+        className="relative rounded-2xl overflow-hidden shadow-md text-white min-h-[220px] flex flex-col justify-end transition-all"
+        style={
+          heroImage?.url
+            ? {
+                backgroundImage: `linear-gradient(to top, rgba(15, 23, 42, 0.88) 0%, rgba(15, 23, 42, 0.5) 60%, rgba(15, 23, 42, 0.3) 100%), url(${heroImage.url})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+              }
+            : undefined
+        }
+      >
+        {!heroImage?.url && (
+          <div className="absolute inset-0 bg-gradient-to-r from-sky-600 via-indigo-600 to-indigo-700 -z-10" />
+        )}
+        <div className="p-6 sm:p-8 relative z-10">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <div className="inline-flex items-center px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-xs font-medium mb-3">
+                <Calendar className="w-3.5 h-3.5 mr-1.5" />
+                {trip.durationDays} Days Itinerary
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight drop-shadow-sm">
+                {trip.destination}
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-100 mt-1 max-w-xl drop-shadow">
+                Personalized day-by-day plan tailored to your preferences, travel style, and budget.
+              </p>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-              {trip.destination}
-            </h1>
-            <p className="text-xs sm:text-sm text-sky-100 mt-1 max-w-xl">
-              Personalized day-by-day plan tailored to your preferences, travel style, and budget.
-            </p>
+
+            {heroImage?.photographer_name && (
+              <div className="text-[11px] text-slate-300 backdrop-blur-sm bg-black/40 px-2.5 py-1 rounded-md self-end sm:self-auto border border-white/10">
+                Photo by{' '}
+                <a
+                  href={`${heroImage.photographer_url}?utm_source=tripgenie_ai&utm_medium=referral`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline hover:text-white transition-colors"
+                >
+                  {heroImage.photographer_name}
+                </a>{' '}
+                on{' '}
+                <a
+                  href="https://unsplash.com/?utm_source=tripgenie_ai&utm_medium=referral"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline hover:text-white transition-colors"
+                >
+                  Unsplash
+                </a>
+              </div>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Destination Photo Gallery Highlights */}
+      {images && images.images && images.images.length > 1 && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center">
+              <Camera className="w-4 h-4 text-sky-600 mr-1.5" />
+              Destination Highlights — {trip.destination}
+            </h3>
+            <span className="text-[11px] text-slate-400">Curated via Unsplash</span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            {images.images.map((img) => (
+              <a
+                key={img.id}
+                href={img.unsplash_url || img.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group relative rounded-xl overflow-hidden aspect-[4/3] bg-slate-100 border border-slate-200 shadow-xs hover:shadow-md transition-all block"
+              >
+                <img
+                  src={img.thumb_url || img.url}
+                  alt={img.alt_description || trip.destination}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  loading="lazy"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2">
+                  <span className="text-[10px] text-white truncate">
+                    {img.photographer_name ? `Photo: ${img.photographer_name}` : trip.destination}
+                  </span>
+                </div>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Days Timeline */}
       <div className="space-y-6">

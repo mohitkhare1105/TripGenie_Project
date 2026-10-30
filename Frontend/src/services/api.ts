@@ -3,11 +3,12 @@ import {
   ApiResponse,
   ItineraryData,
   OptimizeBudgetResponseData,
+  DestinationImagesData,
 } from '../types';
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '') ||
-  'http://localhost:5000';
+  'http://localhost:8000';
 
 export class ApiError extends Error {
   public statusCode: number;
@@ -26,6 +27,52 @@ export class ApiError extends Error {
 }
 
 /**
+ * Retrieves the Supabase authentication access token if available in browser storage.
+ * Inspects explicit keys as well as the standard Supabase Auth SDK session cache (sb-<ref>-auth-token).
+ */
+export function getAuthToken(): string | null {
+  try {
+    // Check direct storage keys
+    const directToken =
+      localStorage.getItem('supabase_token') ||
+      localStorage.getItem('sb-access-token') ||
+      sessionStorage.getItem('supabase_token') ||
+      sessionStorage.getItem('sb-access-token');
+
+    if (directToken) return directToken;
+
+    // Scan localStorage for Supabase JS SDK session keys (e.g. sb-xyz-auth-token)
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.startsWith('sb-') && key.endsWith('-auth-token'))) {
+        const item = JSON.parse(localStorage.getItem(key) || '{}');
+        if (item?.access_token) return item.access_token;
+      }
+    }
+  } catch {
+    // Gracefully handle storage access restrictions or JSON parse errors
+  }
+  return null;
+}
+
+/**
+ * Builds HTTP request headers with Content-Type and optional Supabase Bearer token.
+ */
+function buildHeaders(overrideToken?: string): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+  };
+
+  const token = overrideToken || getAuthToken();
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  return headers;
+}
+
+/**
  * Health check ping
  */
 export async function checkBackendHealth(): Promise<{ status: string }> {
@@ -39,27 +86,25 @@ export async function checkBackendHealth(): Promise<{ status: string }> {
     }
     const data = await res.json();
     return data.data || { status: 'healthy' };
-  } catch (err: unknown) {
+  } catch {
     throw new ApiError('Unable to connect to the TripGenie AI server.', 503);
   }
 }
 
 /**
- * Generates an itinerary with budget calculation
+ * Generates an itinerary with deterministic budget calculation via FastAPI backend
  */
 export async function generateItinerary(
-  input: ItineraryFormInput
+  input: ItineraryFormInput,
+  authToken?: string
 ): Promise<ItineraryData> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 45000);
+  const timeoutId = setTimeout(() => controller.abort(), 60000);
 
   try {
     const res = await fetch(`${API_BASE_URL}/api/itineraries/generate`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
+      headers: buildHeaders(authToken),
       body: JSON.stringify(input),
       signal: controller.signal,
     });
@@ -99,29 +144,29 @@ export async function generateItinerary(
 }
 
 /**
- * Proposes lower-cost itinerary alternatives
+ * Proposes lower-cost itinerary alternatives via FastAPI Smart Budget Optimizer
  */
-export async function optimizeBudget(params: {
-  itinerary: {
-    trip: { destination: string; durationDays: number; currency: string };
-    days: unknown[];
-    notes: string[];
-  };
-  userBudget: number;
-  travellers: number;
-  travelStyle?: string;
-  interests?: string[];
-}): Promise<OptimizeBudgetResponseData> {
+export async function optimizeBudget(
+  params: {
+    itinerary: {
+      trip: { destination: string; durationDays: number; currency: string };
+      days: unknown[];
+      notes: string[];
+    };
+    userBudget: number;
+    travellers: number;
+    travelStyle?: string;
+    interests?: string[];
+  },
+  authToken?: string
+): Promise<OptimizeBudgetResponseData> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 45000);
+  const timeoutId = setTimeout(() => controller.abort(), 60000);
 
   try {
     const res = await fetch(`${API_BASE_URL}/api/itineraries/optimize-budget`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
+      headers: buildHeaders(authToken),
       body: JSON.stringify(params),
       signal: controller.signal,
     });
@@ -162,3 +207,35 @@ export async function optimizeBudget(params: {
   }
 }
 
+/**
+ * Fetches destination images through the FastAPI backend Unsplash service.
+ * The Unsplash API key remains safely server-side.
+ */
+export async function fetchDestinationImages(
+  destination: string,
+  count: number = 4
+): Promise<DestinationImagesData> {
+  try {
+    const encodedDest = encodeURIComponent(destination.trim());
+    const res = await fetch(
+      `${API_BASE_URL}/api/images/destination?query=${encodedDest}&count=${count}`,
+      {
+        method: 'GET',
+        headers: buildHeaders(),
+      }
+    );
+
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`);
+    }
+
+    const json: ApiResponse<DestinationImagesData> = await res.json();
+    if (json.success && json.data) {
+      return json.data;
+    }
+    return { query: destination, images: [] };
+  } catch {
+    // Non-fatal: if images fail, return empty list without disrupting itinerary view
+    return { query: destination, images: [] };
+  }
+}

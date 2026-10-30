@@ -133,3 +133,19 @@ export interface OptimizeBudgetResponseData {
   tradeOffs: string[];
 }
 
+export interface DestinationImage {
+  id: string;
+  url: string;
+  thumb_url: string;
+  alt_description?: string;
+  photographer_name?: string;
+  photographer_url?: string;
+  unsplash_url?: string;
+}
+
+export interface DestinationImagesData {
+  query: string;
+  images: DestinationImage[];
+  primary_image?: DestinationImage | null;
+}
+

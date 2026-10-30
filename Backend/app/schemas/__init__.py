@@ -37,6 +37,7 @@ from .budget import (
     OptimizeBudgetResponse,
     BUDGET_CATEGORIES,
 )
+from .image import DestinationImage, DestinationImagesResponse
 
 __all__ = [
     "ApiResponse",
@@ -73,4 +74,6 @@ __all__ = [
     "MAX_BUDGET",
     "MIN_TRAVELLERS",
     "MAX_TRAVELLERS",
+    "DestinationImage",
+    "DestinationImagesResponse",
 ]

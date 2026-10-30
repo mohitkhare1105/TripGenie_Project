@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     GROQ_TIMEOUT: float = Field(default=30.0, description="Groq API timeout in seconds")
     GROQ_MAX_RETRIES: int = Field(default=1, description="Max retries for transient Groq errors")
 
+    # Unsplash API Configuration (Phase 5 Destination Images)
+    UNSPLASH_ACCESS_KEY: Optional[str] = Field(default=None, description="Unsplash API access key")
+    UNSPLASH_TIMEOUT: float = Field(default=10.0, description="Unsplash API request timeout in seconds")
+
     MAX_BODY_SIZE_BYTES: int = Field(default=102400, description="Max request body size in bytes (100 KB limit)")
     RATE_LIMIT_WINDOW_MS: int = Field(default=900000, description="Rate limit window in milliseconds")
     RATE_LIMIT_MAX_REQUESTS: int = Field(default=20, description="Maximum requests per rate limit window")
@@ -55,6 +59,11 @@ class Settings(BaseSettings):
     def is_groq_configured(self) -> bool:
         """Indicates whether Groq API key is configured."""
         return bool(self.GROQ_API_KEY and self.GROQ_API_KEY.strip())
+
+    @property
+    def is_unsplash_configured(self) -> bool:
+        """Indicates whether Unsplash Access key is configured."""
+        return bool(self.UNSPLASH_ACCESS_KEY and self.UNSPLASH_ACCESS_KEY.strip())
 
     @property
     def server_port(self) -> int:

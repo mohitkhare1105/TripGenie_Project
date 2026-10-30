@@ -10,12 +10,20 @@ import {
   ItineraryFormInput,
   ItineraryData,
   OptimizeBudgetResponseData,
+  DestinationImagesData,
 } from './types';
-import { generateItinerary, optimizeBudget, ApiError } from './services/api';
+import {
+  generateItinerary,
+  optimizeBudget,
+  fetchDestinationImages,
+  ApiError,
+} from './services/api';
 import { Compass, RotateCcw } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [itineraryData, setItineraryData] = useState<ItineraryData | null>(null);
+  const [destinationImages, setDestinationImages] =
+    useState<DestinationImagesData | null>(null);
   const [lastSubmittedInput, setLastSubmittedInput] =
     useState<ItineraryFormInput | null>(null);
 
@@ -39,8 +47,12 @@ export const App: React.FC = () => {
     setLastSubmittedInput(formData);
 
     try {
-      const data = await generateItinerary(formData);
+      const [data, imagesData] = await Promise.all([
+        generateItinerary(formData),
+        fetchDestinationImages(formData.destination, 4),
+      ]);
       setItineraryData(data);
+      setDestinationImages(imagesData);
       // Scroll smoothly down to results
       window.scrollTo({ top: 380, behavior: 'smooth' });
     } catch (err: unknown) {
@@ -95,6 +107,7 @@ export const App: React.FC = () => {
 
   const handleReset = () => {
     setItineraryData(null);
+    setDestinationImages(null);
     setErrorMessage(null);
     setFieldErrors(undefined);
     setOptimizationResult(null);
@@ -167,7 +180,7 @@ export const App: React.FC = () => {
             />
 
             {/* Day-by-Day Itinerary Display */}
-            <ItineraryDisplay data={itineraryData} />
+            <ItineraryDisplay data={itineraryData} images={destinationImages} />
           </div>
         )}
       </main>
