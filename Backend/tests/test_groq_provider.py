@@ -130,7 +130,7 @@ def sample_request() -> ItineraryRequest:
 
 
 def test_groq_provider_unconfigured_raises_503(sample_request):
-    provider = GroqItineraryProvider(api_key=None)
+    provider = GroqItineraryProvider(api_key="")
     with pytest.raises(AiServiceUnavailableError) as exc_info:
         # Trigger client creation
         provider._get_client()

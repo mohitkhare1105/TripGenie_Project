@@ -18,10 +18,8 @@ class ItineraryService:
     ):
         if provider is not None:
             self.provider = provider
-        elif settings.is_groq_configured:
-            self.provider = GroqItineraryProvider()
         else:
-            self.provider = UnconfiguredItineraryProvider()
+            self.provider = GroqItineraryProvider()
         self.budget_srv = budget_srv or budget_service
 
     def set_provider(self, provider: ItineraryProvider) -> None:

@@ -19,8 +19,8 @@ class AiServiceUnavailableError(AppException):
     def __init__(
         self,
         message: str = (
-            "AI itinerary generation service is currently unavailable. "
-            "Provider integration is scheduled for Phase 4."
+            "Groq AI service is not configured. "
+            "Please set the GROQ_API_KEY environment variable in your server configuration."
         ),
     ):
         super().__init__(message=message, status_code=503)
@@ -55,14 +55,13 @@ class ItineraryProvider(ABC):
 
 class UnconfiguredItineraryProvider(ItineraryProvider):
     """
-    Default provider placeholder for Phase 3 before Phase 4 Groq migration.
-    Returns a clean, documented HTTP 503 response without fabricating fake AI data.
+    Fallback provider when no AI API key is configured.
+    Returns a clean HTTP 503 response without fabricating fake AI data.
     """
 
     async def generate_itinerary(self, request: ItineraryRequest) -> ItineraryResponse:
         raise AiServiceUnavailableError(
-            "AI itinerary generation provider is not configured for Phase 3. "
-            "Real AI provider integration is scheduled for Phase 4."
+            "Groq AI service is not configured. Please set the GROQ_API_KEY environment variable in your server configuration."
         )
 
     async def optimize_itinerary(
@@ -73,7 +72,5 @@ class UnconfiguredItineraryProvider(ItineraryProvider):
         destination: str,
     ) -> ItineraryResponse:
         raise AiServiceUnavailableError(
-            "AI budget optimization provider is not configured for Phase 3. "
-            "Real AI provider integration is scheduled for Phase 4."
+            "Groq AI budget optimization is not configured. Please set the GROQ_API_KEY environment variable in your server configuration."
         )
-

@@ -52,9 +52,14 @@ class GroqItineraryProvider(ItineraryProvider):
         if self._client is not None:
             return self._client
 
-        if not self.api_key or not self.api_key.strip():
+        if (
+            not self.api_key
+            or not self.api_key.strip()
+            or "your_" in self.api_key
+            or "placeholder" in self.api_key.lower()
+        ):
             raise AiServiceUnavailableError(
-                "Groq AI service is not configured. Please set GROQ_API_KEY in environment."
+                "Groq AI service is not configured. Please set the GROQ_API_KEY environment variable in your server configuration."
             )
 
         self._client = AsyncGroq(api_key=self.api_key, timeout=self.timeout)

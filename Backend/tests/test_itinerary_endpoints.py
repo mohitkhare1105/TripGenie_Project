@@ -134,7 +134,7 @@ def test_generate_itinerary_unconfigured_provider_returns_503():
     assert response.status_code == 503
     payload = response.json()
     assert payload["success"] is False
-    assert "Phase 4" in payload["message"]
+    assert "GROQ_API_KEY" in payload["message"] or "Groq" in payload["message"]
 
 
 def test_generate_itinerary_with_mocked_provider_success():
