@@ -65,32 +65,33 @@ export const App: React.FC = () => {
   const [isDashboardOpen, setIsDashboardOpen] = useState<boolean>(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
 
-  // Check auth session on load
+  // Maintain authenticated session via Supabase getSession & onAuthStateChange
   useEffect(() => {
-    if (supabase) {
-      supabase.auth.getSession().then(({ data: { session }, error }) => {
-        if (!error && session?.user?.email) {
-          setUserEmail(session.user.email);
-          if (session.access_token) {
-            localStorage.setItem('supabase_token', session.access_token);
-          }
-        } else {
-          // If Supabase session is null or expired, clear stale local session
-          localStorage.removeItem('supabase_token');
-          localStorage.removeItem('supabase_auth_token');
-          localStorage.removeItem('user_email');
-          localStorage.removeItem('tripgenie_user_email');
-          setUserEmail(null);
-        }
-      });
-    } else {
-      // Fallback only if Supabase client is unconfigured
-      const storedEmail = localStorage.getItem('user_email');
-      const token = localStorage.getItem('supabase_token');
-      if (token && storedEmail) {
-        setUserEmail(storedEmail);
+    if (!supabase) return;
+
+    // 1. Initial session load
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (!error && session?.user?.email) {
+        setUserEmail(session.user.email);
+      } else {
+        setUserEmail(null);
       }
-    }
+    });
+
+    // 2. Real-time auth state changes listener (SIGN_IN, SIGNED_OUT, TOKEN_REFRESHED)
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user?.email) {
+        setUserEmail(session.user.email);
+      } else {
+        setUserEmail(null);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const handleAuthSuccess = (email: string) => {
@@ -98,16 +99,12 @@ export const App: React.FC = () => {
     setIsAuthOpen(false);
   };
 
-  const handleSignOut = () => {
-    localStorage.removeItem('supabase_token');
-    localStorage.removeItem('supabase_auth_token');
-    localStorage.removeItem('user_email');
-    localStorage.removeItem('user_name');
-    localStorage.removeItem('tripgenie_user_email');
+  const handleSignOut = async () => {
     if (supabase) {
-      supabase.auth.signOut().catch(() => {});
+      await supabase.auth.signOut().catch(() => {});
     }
     setUserEmail(null);
+    setIsDashboardOpen(false);
   };
 
   const scrollToPlanner = () => {
@@ -409,16 +406,26 @@ export const App: React.FC = () => {
         isOpen={isDashboardOpen}
         onClose={() => setIsDashboardOpen(false)}
         onLogout={handleSignOut}
+        userEmail={userEmail}
         onPlanNewTrip={() => {
           setIsDashboardOpen(false);
           scrollToPlanner();
         }}
         onSelectTrip={(savedTrip: SavedTripRecord) => {
-          if (savedTrip.itinerary_data && typeof savedTrip.itinerary_data === 'object' && 'trip' in savedTrip.itinerary_data) {
+          if (
+            savedTrip.itinerary_data &&
+            typeof savedTrip.itinerary_data === 'object' &&
+            'trip' in savedTrip.itinerary_data
+          ) {
             setItineraryData(savedTrip.itinerary_data as ItineraryData);
             setIsTripSaved(true);
+            fetchDestinationImages(savedTrip.destination, 4)
+              .then((imgs) => setDestinationImages(imgs))
+              .catch(() => {});
             setTimeout(() => {
-              document.getElementById('results-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              document
+                .getElementById('results-section')
+                ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }, 100);
           }
         }}

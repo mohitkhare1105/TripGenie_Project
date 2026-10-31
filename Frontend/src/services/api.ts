@@ -8,6 +8,7 @@ import {
   TripListResult,
   UserProfileData,
 } from '../types';
+import { getValidAccessToken } from './supabase';
 
 function resolveApiBaseUrl(): string {
   const envUrl = import.meta.env.VITE_API_BASE_URL?.trim();
@@ -41,53 +42,17 @@ export class ApiError extends Error {
   }
 }
 
-function isValidJwt(token: string): boolean {
-  if (!token || typeof token !== 'string') return false;
-  const parts = token.trim().split('.');
-  return parts.length === 3 && parts[0].startsWith('eyJ');
-}
-
 /**
- * Retrieves the Supabase authentication access token if available in browser storage.
- * Prioritizes the official Supabase Auth SDK session cache (sb-<ref>-auth-token),
- * and validates that the token has a valid 3-part JWT structure.
+ * Builds HTTP request headers with Content-Type and verified Supabase Bearer token.
+ * Retrieves token directly from the Supabase client session without manual localStorage scanning.
  */
-export function getAuthToken(): string | null {
-  try {
-    // 1. Scan localStorage for Supabase JS SDK session keys (e.g. sb-xyz-auth-token)
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
-        const item = JSON.parse(localStorage.getItem(key) || '{}');
-        const token = item?.access_token;
-        if (token && isValidJwt(token)) return token;
-      }
-    }
-
-    // 2. Check direct storage keys
-    const directToken =
-      localStorage.getItem('supabase_token') ||
-      localStorage.getItem('sb-access-token') ||
-      sessionStorage.getItem('supabase_token') ||
-      sessionStorage.getItem('sb-access-token');
-
-    if (directToken && isValidJwt(directToken)) return directToken;
-  } catch {
-    // Gracefully handle storage access restrictions or JSON parse errors
-  }
-  return null;
-}
-
-/**
- * Builds HTTP request headers with Content-Type and optional Supabase Bearer token.
- */
-function buildHeaders(overrideToken?: string): Record<string, string> {
+async function buildHeaders(overrideToken?: string): Promise<Record<string, string>> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     Accept: 'application/json',
   };
 
-  const token = overrideToken || getAuthToken();
+  const token = overrideToken || (await getValidAccessToken());
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
@@ -115,7 +80,8 @@ export async function checkBackendHealth(): Promise<{ status: string }> {
 }
 
 /**
- * Generates an itinerary with deterministic budget calculation via FastAPI backend
+ * Generates an itinerary with deterministic budget calculation via FastAPI backend.
+ * Public endpoint: works for guests without authentication, or links to user profile if signed in.
  */
 export async function generateItinerary(
   input: ItineraryFormInput,
@@ -125,19 +91,18 @@ export async function generateItinerary(
   const timeoutId = setTimeout(() => controller.abort(), 60000);
 
   try {
+    const headers = await buildHeaders(authToken);
     let res = await fetch(`${API_BASE_URL}/api/itineraries/generate`, {
       method: 'POST',
-      headers: buildHeaders(authToken),
+      headers,
       body: JSON.stringify(input),
       signal: controller.signal,
     });
 
-    // If an invalid or unconfirmed token was rejected with 401 on this public endpoint,
-    // seamlessly retry as a guest so the user is never blocked.
-    if (res.status === 401) {
-      console.warn('Bearer token was rejected by backend. Retrying as guest...');
-      localStorage.removeItem('supabase_token');
-      localStorage.removeItem('supabase_auth_token');
+    // If an invalid or unconfirmed session token was rejected with 401 on this public endpoint,
+    // seamlessly retry as a guest so the user is never blocked from generating an itinerary.
+    if (res.status === 401 && headers['Authorization']) {
+      console.warn('Session token rejected on public endpoint. Retrying as guest...');
       res = await fetch(`${API_BASE_URL}/api/itineraries/generate`, {
         method: 'POST',
         headers: {
@@ -184,7 +149,8 @@ export async function generateItinerary(
 }
 
 /**
- * Proposes lower-cost itinerary alternatives via FastAPI Smart Budget Optimizer
+ * Proposes lower-cost itinerary alternatives via FastAPI Smart Budget Optimizer.
+ * Public endpoint: works for guests without authentication.
  */
 export async function optimizeBudget(
   params: {
@@ -204,19 +170,16 @@ export async function optimizeBudget(
   const timeoutId = setTimeout(() => controller.abort(), 60000);
 
   try {
+    const headers = await buildHeaders(authToken);
     let res = await fetch(`${API_BASE_URL}/api/itineraries/optimize-budget`, {
       method: 'POST',
-      headers: buildHeaders(authToken),
+      headers,
       body: JSON.stringify(params),
       signal: controller.signal,
     });
 
-    // If an invalid or unconfirmed token was rejected with 401 on this public endpoint,
-    // seamlessly retry as a guest so the user is never blocked.
-    if (res.status === 401) {
-      console.warn('Bearer token was rejected by backend. Retrying as guest...');
-      localStorage.removeItem('supabase_token');
-      localStorage.removeItem('supabase_auth_token');
+    if (res.status === 401 && headers['Authorization']) {
+      console.warn('Session token rejected on public budget optimizer. Retrying as guest...');
       res = await fetch(`${API_BASE_URL}/api/itineraries/optimize-budget`, {
         method: 'POST',
         headers: {
@@ -278,7 +241,10 @@ export async function fetchDestinationImages(
       `${API_BASE_URL}/api/images/destination?query=${encodedDest}&count=${count}`,
       {
         method: 'GET',
-        headers: buildHeaders(),
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
       }
     );
 
@@ -292,13 +258,13 @@ export async function fetchDestinationImages(
     }
     return { query: destination, images: [] };
   } catch {
-    // Non-fatal: if images fail, return empty list without disrupting itinerary view
     return { query: destination, images: [] };
   }
 }
 
 /**
- * Saves a generated trip itinerary to Supabase via FastAPI backend
+ * Saves a generated trip itinerary to Supabase via FastAPI backend.
+ * Protected endpoint: requires a valid Supabase authenticated session.
  */
 export async function saveUserTrip(
   payload: {
@@ -315,14 +281,18 @@ export async function saveUserTrip(
   },
   authToken?: string
 ): Promise<SavedTripRecord> {
-  const token = authToken || getAuthToken();
+  const token = authToken || (await getValidAccessToken());
   if (!token) {
     throw new ApiError('Authentication required. Please sign in to save your trip.', 401);
   }
 
   const res = await fetch(`${API_BASE_URL}/api/trips`, {
     method: 'POST',
-    headers: buildHeaders(token),
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
     body: JSON.stringify(payload),
   });
 
@@ -333,6 +303,9 @@ export async function saveUserTrip(
   }));
 
   if (!res.ok || !json.success || !json.data) {
+    if (res.status === 401) {
+      throw new ApiError('Your session has expired. Please sign in again.', 401);
+    }
     throw new ApiError(json.message || 'Failed to save trip', res.status);
   }
 
@@ -340,24 +313,32 @@ export async function saveUserTrip(
 }
 
 /**
- * Fetches all saved trips for the authenticated user from Supabase
+ * Fetches all saved trips for the authenticated user from Supabase.
+ * Protected endpoint: requires a valid Supabase authenticated session.
  */
 export async function fetchUserTrips(
   authToken?: string,
   limit: number = 50,
   offset: number = 0
 ): Promise<TripListResult> {
-  const token = authToken || getAuthToken();
+  const token = authToken || (await getValidAccessToken());
   if (!token) {
-    return { items: [], total: 0 };
+    throw new ApiError('Authentication required. Please sign in to view your trips.', 401);
   }
 
   const res = await fetch(`${API_BASE_URL}/api/trips?limit=${limit}&offset=${offset}`, {
     method: 'GET',
-    headers: buildHeaders(token),
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
   });
 
   if (!res.ok) {
+    if (res.status === 401) {
+      throw new ApiError('Your session has expired. Please sign in again.', 401);
+    }
     throw new ApiError('Failed to fetch saved trips', res.status);
   }
 
@@ -369,35 +350,48 @@ export async function fetchUserTrips(
 }
 
 /**
- * Deletes a saved trip by ID
+ * Deletes a saved trip by ID.
+ * Protected endpoint: requires a valid Supabase authenticated session.
  */
 export async function deleteUserTrip(tripId: string, authToken?: string): Promise<void> {
-  const token = authToken || getAuthToken();
+  const token = authToken || (await getValidAccessToken());
   if (!token) {
-    throw new ApiError('Authentication required to delete trip', 401);
+    throw new ApiError('Authentication required. Please sign in to delete trips.', 401);
   }
 
   const res = await fetch(`${API_BASE_URL}/api/trips/${tripId}`, {
     method: 'DELETE',
-    headers: buildHeaders(token),
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
   });
 
   if (!res.ok) {
+    if (res.status === 401) {
+      throw new ApiError('Your session has expired. Please sign in again.', 401);
+    }
     throw new ApiError('Failed to delete trip', res.status);
   }
 }
 
 /**
- * Retrieves the current user's profile from Supabase via FastAPI backend
+ * Retrieves the current user's profile from Supabase via FastAPI backend.
+ * Protected endpoint: requires a valid Supabase authenticated session.
  */
 export async function fetchUserProfile(authToken?: string): Promise<UserProfileData | null> {
-  const token = authToken || getAuthToken();
+  const token = authToken || (await getValidAccessToken());
   if (!token) return null;
 
   try {
     const res = await fetch(`${API_BASE_URL}/api/users/me`, {
       method: 'GET',
-      headers: buildHeaders(token),
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
     });
 
     if (!res.ok) return null;

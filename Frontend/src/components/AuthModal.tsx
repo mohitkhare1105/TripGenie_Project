@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Lock, Mail, User, Sparkles, CheckCircle2 } from 'lucide-react';
+import { X, Lock, Mail, User, CheckCircle2, AlertCircle } from 'lucide-react';
 import { supabase } from '../services/supabase';
 
 interface AuthModalProps {
@@ -40,22 +40,28 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setIsLoading(true);
 
     try {
-      if (!email) {
+      if (!supabase) {
+        throw new Error(
+          'Supabase authentication service is not configured. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.'
+        );
+      }
+
+      const trimmedEmail = email.trim();
+      if (!trimmedEmail) {
         throw new Error('Please enter your email address.');
       }
 
-      // Password Reset Flow
+      // 1. Password Reset Flow
       if (isForgotPassword) {
-        if (supabase) {
-          const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-            redirectTo: `${window.location.origin}/`,
-          });
-          if (resetError) throw resetError;
-        }
+        const { error: resetError } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
+          redirectTo: `${window.location.origin}/`,
+        });
+        if (resetError) throw resetError;
         setSuccessMessage('Password reset instructions have been sent to your email.');
         return;
       }
 
+      // 2. Validate Password
       if (!password) {
         throw new Error('Please enter your password.');
       }
@@ -63,78 +69,56 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         throw new Error('Password must be at least 6 characters.');
       }
 
-      // Supabase Authentication
-      if (supabase) {
-        if (isSignUp) {
-          const { data, error: signUpError } = await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-              data: {
-                full_name: fullName.trim() || undefined,
-              },
+      // 3. Real Supabase Sign-Up Flow
+      if (isSignUp) {
+        const { data, error: signUpError } = await supabase.auth.signUp({
+          email: trimmedEmail,
+          password,
+          options: {
+            data: {
+              full_name: fullName.trim() || undefined,
             },
-          });
+          },
+        });
 
-          if (signUpError) throw signUpError;
+        if (signUpError) throw signUpError;
 
-          if (data.session?.access_token) {
-            const token = data.session.access_token;
-            localStorage.setItem('supabase_token', token);
-            localStorage.setItem('user_email', email);
-            if (fullName) localStorage.setItem('user_name', fullName);
-            onLoginSuccess(email, token);
-            onClose();
-          } else {
-            setSuccessMessage(
-              'Account created! If email confirmation is enabled, please check your inbox to verify your account, then log in.'
-            );
-            setIsSignUp(false);
-          }
+        if (data.session?.access_token) {
+          onLoginSuccess(trimmedEmail, data.session.access_token);
+          onClose();
+        } else if (data.user) {
+          // If Supabase has email confirmation enabled
+          setSuccessMessage(
+            `Account created! A confirmation link has been sent to ${trimmedEmail}. Please check your inbox and verify your email before signing in.`
+          );
+          setIsSignUp(false);
         } else {
-          const { data, error: signInError } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-          });
-
-          if (signInError) throw signInError;
-
-          if (data.session?.access_token) {
-            const token = data.session.access_token;
-            localStorage.setItem('supabase_token', token);
-            localStorage.setItem('user_email', email);
-            const displayName =
-              data.user?.user_metadata?.full_name ||
-              data.user?.user_metadata?.name ||
-              email.split('@')[0];
-            localStorage.setItem('user_name', displayName);
-            onLoginSuccess(email, token);
-            onClose();
-          } else {
-            throw new Error('Unable to retrieve session token. Please try again.');
-          }
+          throw new Error('Registration could not be completed. Please try again.');
         }
       } else {
-        // Fallback local session if Supabase public key is not yet configured
-        const fallbackToken = btoa(
-          JSON.stringify({
-            email,
-            sub: 'user-' + Date.now(),
-            exp: Math.floor(Date.now() / 1000) + 86400,
-          })
-        );
-        localStorage.setItem('supabase_token', fallbackToken);
-        localStorage.setItem('user_email', email);
-        if (fullName) localStorage.setItem('user_name', fullName);
-        onLoginSuccess(email, fallbackToken);
-        onClose();
+        // 4. Real Supabase Sign-In Flow
+        const { data, error: signInError } = await supabase.auth.signInWithPassword({
+          email: trimmedEmail,
+          password,
+        });
+
+        if (signInError) throw signInError;
+
+        if (data.session?.access_token) {
+          onLoginSuccess(trimmedEmail, data.session.access_token);
+          onClose();
+        } else {
+          throw new Error('Unable to retrieve an active session token. Please try again.');
+        }
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Authentication failed.';
       if (msg.toLowerCase().includes('email not confirmed')) {
         setError(
-          'Email not confirmed yet. Please click the confirmation link sent to your email, or confirm your user in the Supabase Dashboard.'
+          'Email not confirmed yet. Please click the confirmation link sent to your inbox, or confirm your user in the Supabase Dashboard.'
         );
+      } else if (msg.toLowerCase().includes('invalid login credentials')) {
+        setError('Invalid email or password. Please verify your credentials and try again.');
       } else {
         setError(msg);
       }
@@ -143,29 +127,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
-  const handleDemoLogin = () => {
-    const demoEmail = 'traveler@tripgenie.ai';
-    const demoToken = btoa(
-      JSON.stringify({
-        email: demoEmail,
-        sub: 'demo-user-123',
-        exp: Math.floor(Date.now() / 1000) + 86400,
-      })
-    );
-    localStorage.setItem('supabase_token', demoToken);
-    localStorage.setItem('user_email', demoEmail);
-    localStorage.setItem('user_name', 'Alex Mercer');
-    onLoginSuccess(demoEmail, demoToken);
-    onClose();
-  };
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-charcoal-ink/70 backdrop-blur-sm animate-fade-in">
       <div className="relative w-full max-w-md bg-white rounded-[32px] sm:rounded-card p-6 sm:p-8 shadow-elevated border border-ash-gray">
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-6 right-6 p-2 rounded-full text-slate-muted hover:text-charcoal-ink hover:bg-fog-white transition-colors"
+          className="absolute top-6 right-6 p-2 rounded-full text-slate-muted hover:text-charcoal-ink hover:bg-fog-white transition-colors cursor-pointer"
           aria-label="Close"
         >
           <X className="w-5 h-5" />
@@ -178,40 +146,43 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             {isForgotPassword
               ? 'Reset Your Password'
               : isSignUp
-              ? 'Create Your Account'
-              : 'Welcome to TripGenie'}
+              ? 'Create TripGenie Account'
+              : 'Welcome Back'}
           </h2>
-          <p className="text-sm text-slate-muted mt-1">
+          <p className="text-xs text-slate-muted mt-1">
             {isForgotPassword
-              ? 'Enter your email to receive a password reset link.'
+              ? 'Enter your email to receive recovery instructions'
               : isSignUp
-              ? 'Save custom itineraries and sync your travel preferences across devices.'
-              : 'Sign in to access your saved trips and travel dashboard.'}
+              ? 'Save custom itineraries, track travel budgets, and access smart suggestions'
+              : 'Sign in to access your saved itineraries and personalized trips'}
           </p>
         </div>
 
+        {/* Error Feedback */}
         {error && (
-          <div className="mb-4 p-3 rounded-btn bg-rose-50 border border-rose-200 text-xs text-rose-700">
-            {error}
+          <div className="mb-4 p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start space-x-2">
+            <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5 text-rose-600" />
+            <span>{error}</span>
           </div>
         )}
 
+        {/* Success Feedback */}
         {successMessage && (
-          <div className="mb-4 p-3 rounded-btn bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-start space-x-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+          <div className="mb-4 p-3 rounded-2xl bg-teal-50 border border-teal-200 text-teal-800 text-xs flex items-start space-x-2">
+            <CheckCircle2 className="w-4 h-4 flex-shrink-0 mt-0.5 text-teal-600" />
             <span>{successMessage}</span>
           </div>
         )}
 
-        {/* Form */}
+        {/* Auth Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           {isSignUp && !isForgotPassword && (
             <div>
-              <label className="block text-xs font-semibold text-charcoal-ink uppercase tracking-wider mb-1.5">
-                Full Name
+              <label className="block text-xs font-semibold text-charcoal-ink mb-1.5">
+                Full Name (Optional)
               </label>
               <div className="relative">
-                <User className="w-4 h-4 text-slate-muted absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <User className="absolute left-3.5 top-3 w-4 h-4 text-slate-muted" />
                 <input
                   type="text"
                   value={fullName}
@@ -224,11 +195,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           )}
 
           <div>
-            <label className="block text-xs font-semibold text-charcoal-ink uppercase tracking-wider mb-1.5">
+            <label className="block text-xs font-semibold text-charcoal-ink mb-1.5">
               Email Address
             </label>
             <div className="relative">
-              <Mail className="w-4 h-4 text-slate-muted absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <Mail className="absolute left-3.5 top-3 w-4 h-4 text-slate-muted" />
               <input
                 type="email"
                 required
@@ -243,7 +214,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           {!isForgotPassword && (
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-semibold text-charcoal-ink uppercase tracking-wider">
+                <label className="block text-xs font-semibold text-charcoal-ink">
                   Password
                 </label>
                 {!isSignUp && (
@@ -252,21 +223,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     onClick={() => {
                       setIsForgotPassword(true);
                       setError(null);
+                      setSuccessMessage(null);
                     }}
-                    className="text-[11px] text-electric-blue hover:underline"
+                    className="text-xs text-electric-blue hover:underline cursor-pointer"
                   >
                     Forgot password?
                   </button>
                 )}
               </div>
               <div className="relative">
-                <Lock className="w-4 h-4 text-slate-muted absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <Lock className="absolute left-3.5 top-3 w-4 h-4 text-slate-muted" />
                 <input
                   type="password"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
+                  minLength={6}
                   className="w-full pl-10 pr-4 py-2.5 text-sm rounded-btn bg-fog-white border border-ash-gray focus:outline-none focus:border-electric-blue focus:bg-white transition-colors"
                 />
               </div>
@@ -288,19 +261,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </button>
         </form>
 
-        {!isForgotPassword && (
-          <div className="mt-4 pt-4 border-t border-ash-gray/60">
-            <button
-              type="button"
-              onClick={handleDemoLogin}
-              className="w-full py-2.5 px-4 rounded-btn bg-tide-tint hover:bg-ocean-teal/15 text-charcoal-ink font-semibold text-xs flex items-center justify-center transition-colors border border-ocean-teal/20 cursor-pointer"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-ocean-teal mr-2" />
-              Quick Demo Login (Guest Traveler)
-            </button>
-          </div>
-        )}
-
         <div className="mt-4 text-center">
           {isForgotPassword ? (
             <button
@@ -309,7 +269,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 setIsForgotPassword(false);
                 setError(null);
               }}
-              className="text-xs font-semibold text-electric-blue hover:underline"
+              className="text-xs font-semibold text-electric-blue hover:underline cursor-pointer"
             >
               Back to Sign In
             </button>
@@ -321,9 +281,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 setError(null);
                 setSuccessMessage(null);
               }}
-              className="text-xs font-semibold text-electric-blue hover:underline"
+              className="text-xs text-slate-muted hover:text-charcoal-ink cursor-pointer"
             >
-              {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
+              {isSignUp ? (
+                <>
+                  Already have an account?{' '}
+                  <span className="font-semibold text-electric-blue hover:underline">
+                    Sign In
+                  </span>
+                </>
+              ) : (
+                <>
+                  Don't have an account?{' '}
+                  <span className="font-semibold text-electric-blue hover:underline">
+                    Sign Up Free
+                  </span>
+                </>
+              )}
             </button>
           )}
         </div>
