@@ -65,25 +65,31 @@ export const App: React.FC = () => {
   const [isDashboardOpen, setIsDashboardOpen] = useState<boolean>(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
 
-  // Check auth on load
+  // Check auth session on load
   useEffect(() => {
     if (supabase) {
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session?.user?.email) {
+      supabase.auth.getSession().then(({ data: { session }, error }) => {
+        if (!error && session?.user?.email) {
           setUserEmail(session.user.email);
-          return;
+          if (session.access_token) {
+            localStorage.setItem('supabase_token', session.access_token);
+          }
+        } else {
+          // If Supabase session is null or expired, clear stale local session
+          localStorage.removeItem('supabase_token');
+          localStorage.removeItem('supabase_auth_token');
+          localStorage.removeItem('user_email');
+          localStorage.removeItem('tripgenie_user_email');
+          setUserEmail(null);
         }
       });
-    }
-
-    const storedEmail =
-      localStorage.getItem('user_email') ||
-      localStorage.getItem('tripgenie_user_email');
-    const token =
-      localStorage.getItem('supabase_token') ||
-      localStorage.getItem('supabase_auth_token');
-    if (token && storedEmail) {
-      setUserEmail(storedEmail);
+    } else {
+      // Fallback only if Supabase client is unconfigured
+      const storedEmail = localStorage.getItem('user_email');
+      const token = localStorage.getItem('supabase_token');
+      if (token && storedEmail) {
+        setUserEmail(storedEmail);
+      }
     }
   }, []);
 
